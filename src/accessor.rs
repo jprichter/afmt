@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use crate::{message_helper::red, utility::get_source_code};
+use crate::{message_helper::red, utility::with_source_code};
 
 // `c` => child
 // `cv` => child value
@@ -32,9 +32,9 @@ pub trait Accessor<'t> {
     fn next_named(&self) -> Node<'t>;
 
     // private fn;
-    fn v<'a>(&self) -> &'a str;
-    fn cv_by_k(&self, name: &str) -> &str;
-    fn cv_by_n<'a>(&self, name: &str) -> &'a str;
+    fn v(&self) -> String;
+    fn cv_by_k(&self, name: &str) -> String;
+    fn cv_by_n(&self, name: &str) -> String;
 }
 
 impl<'t> Accessor<'t> for Node<'t> {
@@ -49,13 +49,18 @@ impl<'t> Accessor<'t> for Node<'t> {
         panic!("{}: next_named node missing.", red(self.kind()));
     }
 
-    fn v<'a>(&self) -> &'a str {
-        self.utf8_text(get_source_code().as_bytes())
-            .unwrap_or_else(|_| panic!("{}: get AST source_code value failed.", red(self.kind())))
+    fn v(&self) -> String {
+        with_source_code(|source_code| {
+            self.utf8_text(source_code.as_bytes())
+                .unwrap_or_else(|_| {
+                    panic!("{}: get AST source_code value failed.", red(self.kind()))
+                })
+                .to_string()
+        })
     }
 
     fn value(&self) -> String {
-        self.v().to_string()
+        self.v()
     }
 
     fn children_vec(&self) -> Vec<Node<'t>> {
@@ -123,12 +128,12 @@ impl<'t> Accessor<'t> for Node<'t> {
         );
     }
 
-    fn cv_by_k(&self, name: &str) -> &str {
+    fn cv_by_k(&self, name: &str) -> String {
         let child_node = self.c_by_k(name);
         child_node.v()
     }
 
-    fn cv_by_n<'a>(&self, name: &str) -> &'a str {
+    fn cv_by_n(&self, name: &str) -> String {
         let node = self.child_by_field_name(name).unwrap_or_else(|| {
             panic!(
                 "## {}: missing mandatory name child: {}\n ##Source_code: {}",
@@ -141,11 +146,11 @@ impl<'t> Accessor<'t> for Node<'t> {
     }
 
     fn cvalue_by_n(&self, name: &str) -> String {
-        self.cv_by_n(name).to_string()
+        self.cv_by_n(name)
     }
 
     fn cvalue_by_k(&self, name: &str) -> String {
-        self.cv_by_k(name).to_string()
+        self.cv_by_k(name)
     }
 
     fn c_by_n(&self, name: &str) -> Node<'t> {

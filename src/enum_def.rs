@@ -314,6 +314,8 @@ impl<'a> DocBuild<'a> for Expression {
 //  ),
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum PrimaryExpression {
     Literal(Literal_),
     Identifier(ValueNode),
@@ -1461,7 +1463,7 @@ impl DateLiteralWithParam {
 impl<'a> DocBuild<'a> for DateLiteralWithParam {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(format!("{}:{}", &self.date_literal, &self.param)));
+            result.push(b.txt(format!("{}:{}", self.date_literal, self.param)));
         });
     }
 }
@@ -1563,6 +1565,8 @@ impl<'a> DocBuild<'a> for OffsetClause {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum FunctionExpressionVariant {
     WithGEO {
         function_name: ValueNode,

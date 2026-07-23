@@ -445,13 +445,13 @@ impl ClassBody {
 impl<'a> DocBuild<'a> for ClassBody {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         let bucket = get_comment_bucket(&self.node_context.id);
-        handle_pre_comments(b, bucket, result);
+        handle_pre_comments(b, &bucket, result);
 
         if bucket.dangling_comments.is_empty() {
             result.push(b.surround_body_members(&self.class_members, "{", "}"));
-            handle_post_comments(b, bucket, result);
+            handle_post_comments(b, &bucket, result);
         } else {
-            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, &bucket, result);
         }
     }
 }
@@ -600,6 +600,8 @@ impl<'a> DocBuild<'a> for AssignmentExpression {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum AssignmentLeft {
     Identifier(ValueNode),
     Field(FieldAccess),
@@ -683,16 +685,16 @@ impl Block {
 impl<'a> DocBuild<'a> for Block {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         let bucket = get_comment_bucket(&self.node_context.id);
-        handle_pre_comments(b, bucket, result);
+        handle_pre_comments(b, &bucket, result);
 
         if bucket.dangling_comments.is_empty() {
             let docs = b.surround_body_members(&self.statements, "{", "}");
             result.push(docs);
         } else {
-            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, &bucket, result);
             return;
         }
-        handle_post_comments(b, bucket, result);
+        handle_post_comments(b, &bucket, result);
     }
 }
 
@@ -1444,6 +1446,8 @@ impl<'a> DocBuild<'a> for ParenthesizedExpression {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum ForInitOption {
     Declaration(LocalVariableDeclaration),
     Exps(Vec<Expression>),
@@ -1828,7 +1832,7 @@ impl ConstructorBody {
 impl<'a> DocBuild<'a> for ConstructorBody {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         let bucket = get_comment_bucket(&self.node_context.id);
-        handle_pre_comments(b, bucket, result);
+        handle_pre_comments(b, &bucket, result);
 
         if bucket.dangling_comments.is_empty() {
             if self.constructor_invocation.is_none() && self.statements.is_empty() {
@@ -1855,7 +1859,7 @@ impl<'a> DocBuild<'a> for ConstructorBody {
             result.push(b.nl());
             result.push(b.txt("}"));
         } else {
-            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, &bucket, result);
         }
     }
 }
@@ -2342,7 +2346,7 @@ impl EnumBody {
 impl<'a> DocBuild<'a> for EnumBody {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         let bucket = get_comment_bucket(&self.node_context.id);
-        handle_pre_comments(b, bucket, result);
+        handle_pre_comments(b, &bucket, result);
 
         if bucket.dangling_comments.is_empty() {
             let docs = b.to_docs(&self.enum_constants);
@@ -2356,9 +2360,9 @@ impl<'a> DocBuild<'a> for EnumBody {
             let close = Insertable::new(Some(b.nl()), Some("}"), None);
             let doc = b.group_surround(&docs, sep, open, close);
             result.push(doc);
-            handle_post_comments(b, bucket, result);
+            handle_post_comments(b, &bucket, result);
         } else {
-            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, &bucket, result);
         }
     }
 }
@@ -2623,27 +2627,31 @@ impl ArrayCreationExpression {
         let value_node = node.try_c_by_n("value");
         let dimensions_node = node.try_c_by_n("dimensions");
 
-        let variant = if value_node.is_none() {
-            // DD
-            let dimensions_exprs = node
-                .cs_by_k("dimensions_expr")
-                .into_iter()
-                .map(|n| DimensionsExpr::new(n))
-                .collect();
-            let dimensions = node.try_c_by_k("dimensions").map(|n| Dimensions::new(n));
-            ArrayCreationVariant::DD {
-                dimensions_exprs,
-                dimensions,
+        let variant = match (value_node, dimensions_node) {
+            (None, _) => {
+                // DD
+                let dimensions_exprs = node
+                    .cs_by_k("dimensions_expr")
+                    .into_iter()
+                    .map(|n| DimensionsExpr::new(n))
+                    .collect();
+                let dimensions = node.try_c_by_k("dimensions").map(|n| Dimensions::new(n));
+                ArrayCreationVariant::DD {
+                    dimensions_exprs,
+                    dimensions,
+                }
             }
-        } else if dimensions_node.is_none() {
-            //OnlyV
-            let value = ArrayInitializer::new(node.c_by_n("value"));
-            ArrayCreationVariant::OnlyV { value }
-        } else {
-            //DV
-            ArrayCreationVariant::DV {
-                value: ArrayInitializer::new(value_node.unwrap()),
-                dimensions: Dimensions::new(dimensions_node.unwrap()),
+            (Some(value_node), None) => {
+                // OnlyV
+                let value = ArrayInitializer::new(value_node);
+                ArrayCreationVariant::OnlyV { value }
+            }
+            (Some(value_node), Some(dimensions_node)) => {
+                // DV
+                ArrayCreationVariant::DV {
+                    value: ArrayInitializer::new(value_node),
+                    dimensions: Dimensions::new(dimensions_node),
+                }
             }
         };
 
@@ -3105,13 +3113,13 @@ impl InterfaceBody {
 impl<'a> DocBuild<'a> for InterfaceBody {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         let bucket = get_comment_bucket(&self.node_context.id);
-        handle_pre_comments(b, bucket, result);
+        handle_pre_comments(b, &bucket, result);
 
         if bucket.dangling_comments.is_empty() {
             result.push(b.surround_body_members(&self.members, "{", "}"));
-            handle_post_comments(b, bucket, result);
+            handle_post_comments(b, &bucket, result);
         } else {
-            handle_dangling_comments_in_bracket_surround(b, bucket, result);
+            handle_dangling_comments_in_bracket_surround(b, &bucket, result);
         }
     }
 }
@@ -3903,6 +3911,8 @@ impl<'a> DocBuild<'a> for QueryExpression {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum QueryBody {
     Soql(SoqlQueryBody),
     Sosl(SoslQueryBody),
@@ -5099,6 +5109,8 @@ impl<'a> DocBuild<'a> for GroupByClause {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum GroupByExpression {
     Field(FieldIdentifier),
     Func(FunctionExpression),
