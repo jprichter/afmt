@@ -123,9 +123,10 @@ impl<'a> DocBuild<'a> for ClassDeclaration {
                 docs.push(n.build(b));
             }
 
-            docs.push(b.txt(" "));
             result.push(b.group_indent_concat(docs));
-
+            // Separator lives outside the group: newlines (Allman) can't compose
+            // with group(...). In K&R this is the same trailing space as before.
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -170,7 +171,7 @@ impl<'a> DocBuild<'a> for MethodDeclaration {
             result.push(self.formal_parameters.build(b));
 
             if let Some(ref n) = self.body {
-                result.push(b.txt(" "));
+                result.push(b.body_open_sep());
                 let body_doc = n.build(b);
                 result.push(body_doc);
             }
@@ -1772,7 +1773,7 @@ impl<'a> DocBuild<'a> for ConstructorDeclaration {
 
             result.push(self.name.build(b));
             result.push(self.parameters.build(b));
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -3018,7 +3019,7 @@ impl<'a> DocBuild<'a> for InterfaceDeclaration {
                 result.push(n.build(b));
             }
 
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -3777,7 +3778,7 @@ impl<'a> DocBuild<'a> for TriggerDeclaration {
             let doc = b.group_surround(&docs, sep, open, close);
             result.push(doc);
 
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }

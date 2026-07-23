@@ -89,6 +89,7 @@ fn default_excludes() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::doc::{BraceStyle, IndentStyle};
 
     #[test]
     fn old_two_key_config_uses_default_file_selection() {
@@ -114,5 +115,32 @@ mod tests {
 
         assert_eq!(config.files.include, FileSelectionConfig::default().include);
         assert!(config.files.exclude.is_empty());
+    }
+
+    #[test]
+    fn style_keys_default_when_omitted() {
+        let config: AfmtConfig = toml::from_str("max_width = 80\n").unwrap();
+
+        assert_eq!(config.formatter.brace_style, BraceStyle::KAndR);
+        assert_eq!(config.formatter.indent_style, IndentStyle::Space);
+        assert!(!config.formatter.wrap_single_statements);
+    }
+
+    #[test]
+    fn style_keys_parse_from_snake_case() {
+        let config: AfmtConfig = toml::from_str(
+            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\n",
+        )
+        .unwrap();
+
+        assert_eq!(config.formatter.brace_style, BraceStyle::Allman);
+        assert_eq!(config.formatter.indent_style, IndentStyle::Tab);
+        assert!(config.formatter.wrap_single_statements);
+    }
+
+    #[test]
+    fn invalid_brace_style_is_an_error() {
+        let result: Result<AfmtConfig, _> = toml::from_str("brace_style = \"stroustrup\"\n");
+        assert!(result.is_err());
     }
 }

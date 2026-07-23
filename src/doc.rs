@@ -27,16 +27,46 @@ struct PrettyPrinter<'a> {
     chunks: Vec<Chunk<'a>>,
 }
 
+/// Placement of an opening brace relative to the construct that owns it.
+///
+/// This is the only axis that distinguishes K&R from Allman output: the brace's
+/// own internal layout (open, indented body, close on its own line) is shared by
+/// both styles. See `DocBuilder::body_open_sep`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BraceStyle {
+    /// Opening brace stays on the same line as the header: `class Foo {`.
+    #[default]
+    KAndR,
+    /// Opening brace drops to its own line at the header's indent:
+    /// `class Foo\n{`.
+    Allman,
+}
+
+/// Indentation character. Consumed by the printer in a later step; carried here
+/// so the config surface is complete.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndentStyle {
+    #[default]
+    Space,
+    Tab,
+}
+
 pub struct PrettyConfig {
     pub indent_size: u32,
+    pub brace_style: BraceStyle,
 }
 
 impl PrettyConfig {
-    pub fn new(indent_size: u32) -> Self {
+    pub fn new(indent_size: u32, brace_style: BraceStyle) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
         } else {
-            Self { indent_size }
+            Self {
+                indent_size,
+                brace_style,
+            }
         }
     }
 }

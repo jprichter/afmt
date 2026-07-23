@@ -1,6 +1,6 @@
 use crate::{
     data_model::DocBuild,
-    doc::{Doc, DocRef, PrettyConfig},
+    doc::{BraceStyle, Doc, DocRef, PrettyConfig},
     enum_def::BodyMember,
 };
 use typed_arena::Arena;
@@ -220,6 +220,20 @@ impl<'a> DocBuilder<'a> {
     pub fn indent(&'a self, doc_ref: DocRef<'a>) -> DocRef<'a> {
         let relative_indent = self.config.indent_size;
         self.arena.alloc(Doc::Indent(relative_indent, doc_ref))
+    }
+
+    /// Separator emitted between a construct's header and its opening brace.
+    ///
+    /// This is the sole difference between K&R and Allman: a space keeps the
+    /// brace on the header line; a newline drops it to its own line at the
+    /// header's indent. Callers that currently push `b.txt(" ")` before a body
+    /// block should push this instead. Must not be placed inside a `group(...)`
+    /// (newlines don't compose with groups).
+    pub fn body_open_sep(&'a self) -> DocRef<'a> {
+        match self.config.brace_style {
+            BraceStyle::KAndR => self.txt(" "),
+            BraceStyle::Allman => self.nl(),
+        }
     }
 
     pub fn dedent(&'a self, doc_ref: DocRef<'a>) -> DocRef<'a> {
