@@ -1,0 +1,7 @@
+Account[] accts = [SELECT Id FROM Account LIMIT 5];
+List<Contact> cons = new List<Contact>();
+for (Account a : accts) {
+cons.add(new Contact(LastName = 'x', AccountId = a.Id));
+}
+insert cons;
+System.debug('done');
