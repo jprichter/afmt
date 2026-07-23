@@ -236,6 +236,51 @@ impl<'a> DocBuilder<'a> {
         }
     }
 
+    /// Whether single-statement clause bodies are wrapped in synthesized braces.
+    pub fn wraps_single(&self) -> bool {
+        self.config.wrap_single_statements
+    }
+
+    /// Brace-wrap an already-built single (non-block) statement: separator +
+    /// `{` + indented statement + `}` on its own line. Honors `brace_style` via
+    /// `body_open_sep`.
+    fn wrap_single(&'a self, body: DocRef<'a>) -> DocRef<'a> {
+        self.concat(vec![
+            self.body_open_sep(),
+            self.txt("{"),
+            self.indent(self.nl()),
+            self.indent(body),
+            self.nl(),
+            self.txt("}"),
+        ])
+    }
+
+    /// Emit a control-flow clause body (an `if`/`else`/loop body) with brace
+    /// placement and single-statement wrapping driven by config.
+    ///
+    /// - Block body: `body_open_sep` + the block (already brace-wrapped).
+    /// - Single statement + `wrap_single_statements`: synthesize a brace block.
+    /// - Single statement otherwise: the legacy brace-less form. `break_single`
+    ///   selects the fallback layout that must be preserved per construct:
+    ///   `true` puts the statement on its own indented line (`if` style),
+    ///   `false` keeps it inline after a space (loop style).
+    pub fn clause_body(
+        &'a self,
+        body: DocRef<'a>,
+        is_block: bool,
+        break_single: bool,
+    ) -> DocRef<'a> {
+        if is_block {
+            self.concat(vec![self.body_open_sep(), body])
+        } else if self.config.wrap_single_statements {
+            self.wrap_single(body)
+        } else if break_single {
+            self.concat(vec![self.indent(self.nl()), self.indent(body)])
+        } else {
+            self.concat(vec![self.txt(" "), body])
+        }
+    }
+
     pub fn dedent(&'a self, doc_ref: DocRef<'a>) -> DocRef<'a> {
         let relative_indent = self.config.indent_size;
         self.arena.alloc(Doc::Dedent(relative_indent, doc_ref))

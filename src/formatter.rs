@@ -248,7 +248,11 @@ impl Formatter {
         let root: Root = enrich(&ast_tree);
 
         // traverse enriched data and create pretty print combinators
-        let c = PrettyConfig::new(config.indent_size, config.brace_style);
+        let c = PrettyConfig::new(
+            config.indent_size,
+            config.brace_style,
+            config.wrap_single_statements,
+        );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 
@@ -340,7 +344,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, Formatter};
+    use super::{BraceStyle, Config, Formatter};
     use rayon::prelude::*;
     #[cfg(unix)]
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};
@@ -563,6 +567,50 @@ mod tests {
         assert_eq!(outcome.path, path);
         assert!(outcome.result.is_ok());
         fs::remove_dir_all(directory).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn allman_moves_container_and_control_braces_to_their_own_line() {
+        let source = "class T {\n  void m() {\n    if (a) { x(); }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(
+            out,
+            "class T\n{\n  void m()\n  {\n    if (a)\n    {\n      x();\n    }\n  }\n}\n"
+        );
+    }
+
+    #[test]
+    fn wrap_single_statements_adds_braces_to_bare_clause_bodies() {
+        let source = "class T {\n  void m() {\n    if (a) x(); else y();\n    for (Account acc : accts) z();\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        // Bare `if`/`else` and loop bodies each gain a brace block; else-if stays
+        // inline (none here). K&R placement is preserved (default brace_style).
+        assert!(out.contains("if (a) {\n      x();\n    } else {\n      y();\n    }"));
+        assert!(out.contains("for (Account acc : accts) {\n      z();\n    }"));
+    }
+
+    #[test]
+    fn default_config_keeps_k_and_r_and_bare_bodies() {
+        let source = "class T {\n  void m() {\n    if (a) x();\n  }\n}\n";
+
+        let out = Formatter::format_one(source, Config::default());
+
+        assert_eq!(
+            out,
+            "class T {\n  void m() {\n    if (a)\n      x();\n  }\n}\n"
+        );
     }
 
     #[test]

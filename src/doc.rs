@@ -56,16 +56,18 @@ pub enum IndentStyle {
 pub struct PrettyConfig {
     pub indent_size: u32,
     pub brace_style: BraceStyle,
+    pub wrap_single_statements: bool,
 }
 
 impl PrettyConfig {
-    pub fn new(indent_size: u32, brace_style: BraceStyle) -> Self {
+    pub fn new(indent_size: u32, brace_style: BraceStyle, wrap_single_statements: bool) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
         } else {
             Self {
                 indent_size,
                 brace_style,
+                wrap_single_statements,
             }
         }
     }

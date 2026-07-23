@@ -1360,33 +1360,46 @@ impl<'a> DocBuild<'a> for IfStatement {
             result.push(b.txt("if "));
             result.push(self.condition.build(b));
 
-            if self.consequence.is_block() {
-                result.push(b.txt(" "));
-                result.push(self.consequence.build(b));
-            } else {
-                result.push(b.indent(b.nl()));
-                result.push(b.indent(self.consequence.build(b)));
-            }
+            // Consequence body. `if` style: a brace-less single statement breaks
+            // onto its own indented line.
+            result.push(b.clause_body(
+                self.consequence.build(b),
+                self.consequence.is_block(),
+                true,
+            ));
 
-            // Handle the 'else' part
+            // Did the consequence render a closing brace on its own line — a real
+            // block, or a single statement we wrapped in braces?
+            let cons_braced = self.consequence.is_block() || b.wraps_single();
+
+            // Handle the 'else' part.
             if let Some(ref alt) = self.alternative {
-                if self.consequence.is_block() {
-                    result.push(b.txt(" "));
-
-                    result.push(alt.else_node.build(b));
-                    result.push(b.txt(" "));
+                // Separator between the end of the consequence and `else`.
+                if cons_braced {
+                    result.push(b.body_open_sep());
                 } else {
                     result.push(b.nl());
+                }
+                result.push(alt.else_node.build(b));
 
-                    result.push(alt.else_node.build(b));
-
-                    if !matches!(alt.statement, Statement::If(_) | Statement::Block(_)) {
-                        result.push(b.indent(b.nl()));
-                    } else {
+                match alt.statement {
+                    // `else if (...)`: keep the chain inline in every style.
+                    Statement::If(_) => {
                         result.push(b.txt(" "));
+                        result.push(alt.statement.build(b));
+                    }
+                    // `else { ... }`: block body, brace placement per style.
+                    Statement::Block(_) => {
+                        result.push(b.body_open_sep());
+                        result.push(alt.statement.build(b));
+                    }
+                    // Single-statement else. Legacy fallback differs by context:
+                    // after a braced consequence it hugs the line (`} else y;`),
+                    // after a brace-less one it breaks (`else\n  y;`).
+                    _ => {
+                        result.push(b.clause_body(alt.statement.build(b), false, !cons_braced));
                     }
                 }
-                result.push(alt.statement.build(b));
             }
         });
     }
@@ -1550,8 +1563,8 @@ impl<'a> DocBuild<'a> for ForStatement {
             match self.body {
                 Statement::SemiColumn => result.push(b.txt(";")),
                 _ => {
-                    result.push(b.txt(" "));
-                    result.push(self.body.build(b));
+                    // Loop style: a brace-less single body stays inline.
+                    result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
                 }
             }
         });
@@ -1599,8 +1612,8 @@ impl<'a> DocBuild<'a> for EnhancedForStatement {
             match self.body {
                 Statement::SemiColumn => result.push(b.txt(";")),
                 _ => {
-                    result.push(b.txt(" "));
-                    result.push(self.body.build(b));
+                    // Loop style: a brace-less single body stays inline.
+                    result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
                 }
             }
         });
@@ -2086,9 +2099,11 @@ impl DoStatement {
 impl<'a> DocBuild<'a> for DoStatement {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt_("do"));
+            result.push(b.txt("do"));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
-            result.push(b._txt_("while"));
+            result.push(b.body_open_sep());
+            result.push(b.txt_("while"));
             result.push(self.condition.build(b));
         });
     }
@@ -2122,8 +2137,8 @@ impl<'a> DocBuild<'a> for WhileStatement {
             match self.body {
                 Statement::SemiColumn => {}
                 _ => {
-                    result.push(b.txt(" "));
-                    result.push(self.body.build(b));
+                    // Loop style: a brace-less single body stays inline.
+                    result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
                 }
             }
         });
