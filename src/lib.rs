@@ -1,7 +1,9 @@
 mod accessor;
 pub mod args;
+pub mod config;
 mod context;
 mod data_model;
+pub mod discovery;
 mod doc;
 mod doc_builder;
 mod enum_def;

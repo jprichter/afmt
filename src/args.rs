@@ -1,9 +1,10 @@
 use clap::{Arg as ClapArg, Command};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Args {
-    pub path: String,
-    pub config: Option<String>,
+    pub paths: Vec<PathBuf>,
+    pub config: Option<PathBuf>,
     pub write: bool,
     pub time: bool,
     pub check: bool,
@@ -12,23 +13,42 @@ pub struct Args {
 pub fn get_args() -> Args {
     let version = env!("CARGO_PKG_VERSION"); // read from Cargo.toml in compiling time
 
-    let matches = Command::new("afmt")
+    let matches = command(version).get_matches();
+
+    Args {
+        paths: matches
+            .get_many::<PathBuf>("path")
+            .expect("At least one path is required")
+            .cloned()
+            .collect(),
+        config: matches.get_one::<PathBuf>("config").cloned(),
+        write: matches.get_flag("write"),
+        time: matches.get_flag("time"),
+        check: matches.get_flag("check"),
+    }
+}
+
+fn command(version: &'static str) -> Command {
+    Command::new("afmt")
         .version(version)
         .about(format!("Apex format tool (afmt): {}", version))
         .arg_required_else_help(true)
         .arg(
-            ClapArg::new("file")
-                .value_name("FILE")
-                .help("The relative path to the file to parse")
+            ClapArg::new("path")
+                .value_name("PATH")
+                .help("A file or directory to format")
                 .required(true)
-                .index(1),
+                .index(1)
+                .num_args(1..)
+                .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
             ClapArg::new("config")
                 .short('c')
                 .long("config")
                 .value_name("CONFIG")
-                .help("Path to the .afmt.toml configuration file"),
+                .help("Path to the .afmt.toml configuration file")
+                .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
             ClapArg::new("write")
@@ -61,8 +81,14 @@ pub fn get_args() -> Args {
              # Format and write changes back to the file\n\
              afmt --write src/file.cls\n\
              \n\
+             # Format a directory recursively\n\
+             afmt --write force-app\n\
+             \n\
+             # Check mixed files and directories\n\
+             afmt --check force-app packages/shared.cls\n\
+             \n\
              # Use a specific config file\n\
-             afmt --config .afmt.toml ./file.cls\n\
+             afmt --config .afmt.toml --time --write .\n\
              \n\
              # Display execution time after formatting\n\
              afmt --time ./file.cls\n\
@@ -71,16 +97,30 @@ pub fn get_args() -> Args {
              afmt --check ./file.cls\n\
             ",
         )
-        .get_matches();
+}
 
-    Args {
-        path: matches
-            .get_one::<String>("file")
-            .expect("File path is required")
-            .to_string(),
-        config: matches.get_one::<String>("config").map(|s| s.to_string()),
-        write: matches.get_flag("write"),
-        time: matches.get_flag("time"),
-        check: matches.get_flag("check"),
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_one_or_more_path_values() {
+        let matches = command("test")
+            .try_get_matches_from(["afmt", "one.cls", "nested", "two.apex"])
+            .unwrap();
+        let paths = matches
+            .get_many::<PathBuf>("path")
+            .unwrap()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            paths,
+            vec![
+                PathBuf::from("one.cls"),
+                PathBuf::from("nested"),
+                PathBuf::from("two.apex")
+            ]
+        );
     }
 }

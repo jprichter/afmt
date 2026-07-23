@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashMap};
+use std::{cell::Cell, collections::HashMap, rc::Rc};
 use tree_sitter::Node;
 
 use crate::{
@@ -45,7 +45,7 @@ impl NodeContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommentBucket {
     pub pre_comments: Vec<Comment>,
     pub post_comments: Vec<Comment>,
@@ -74,7 +74,7 @@ pub struct Comment {
     pub value: String,
     pub comment_type: CommentType,
     pub metadata: CommentMetadata,
-    pub is_printed: Cell<bool>,
+    pub is_printed: Rc<Cell<bool>>,
 }
 
 impl Comment {
@@ -98,7 +98,7 @@ impl Comment {
             value,
             comment_type,
             metadata,
-            is_printed: Cell::new(false),
+            is_printed: Rc::new(Cell::new(false)),
         }
     }
 
