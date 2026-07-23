@@ -5,3 +5,8 @@ max_width = 80
 
 # Indentation size in spaces
 indent_size = 4
+
+# Optional replacement file-selection arrays. Uncomment to customize them.
+# [files]
+# include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
+# exclude = ["**/.git/**", "**/.sfdx/**", "**/node_modules/**"]

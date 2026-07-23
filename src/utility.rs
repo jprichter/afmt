@@ -7,7 +7,7 @@ use crate::{
     enum_def::{Comparison, SetValue, SoqlLiteral, ValueComparedWith},
     message_helper::{red, yellow},
 };
-use std::{cell::Cell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap};
 use tree_sitter::{Node, Tree, TreeCursor};
 
 const SNIPPET_MAX_LEN: usize = 80;
@@ -16,54 +16,87 @@ pub fn truncate_snippet(snippet: &str) -> String {
     if snippet.len() <= SNIPPET_MAX_LEN {
         snippet.to_string()
     } else {
-        format!("{}…", &snippet[..SNIPPET_MAX_LEN])
+        let end = snippet
+            .char_indices()
+            .take_while(|(index, character)| index + character.len_utf8() <= SNIPPET_MAX_LEN)
+            .map(|(index, character)| index + character.len_utf8())
+            .last()
+            .unwrap_or(0);
+        format!("{}…", &snippet[..end])
     }
 }
 
 thread_local! {
-    static THREAD_SOURCE_CODE: Cell<Option<&'static str>>
-        = const{ Cell::new(None) };
+    static THREAD_SOURCE_CODE: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 pub fn set_thread_source_code(source_code: String) {
-    // TODO: use OnceCell to not leak?
-    let leaked_code: &'static str = Box::leak(source_code.into_boxed_str());
     THREAD_SOURCE_CODE.with(|sc| {
-        if sc.get().is_some() {
+        let mut source = sc.borrow_mut();
+        if source.is_some() {
             panic!("Source code is already set for this thread");
         }
-        sc.set(Some(leaked_code));
+        *source = Some(source_code);
     });
 }
 
-pub fn get_source_code() -> &'static str {
-    THREAD_SOURCE_CODE.with(|sc| sc.get().expect("Source code not set for this thread"))
+pub fn clear_thread_source_code() {
+    THREAD_SOURCE_CODE.with(|sc| sc.borrow_mut().take());
+}
+
+pub fn with_source_code<T>(callback: impl FnOnce(&str) -> T) -> T {
+    THREAD_SOURCE_CODE.with(|sc| {
+        let source = sc.borrow();
+        callback(
+            source
+                .as_deref()
+                .expect("Source code not set for this thread"),
+        )
+    })
 }
 
 thread_local! {
-    static THREAD_COMMENT_MAP: Cell<Option<&'static CommentMap>> = const{ Cell::new(None) };
+    static THREAD_COMMENT_MAP: RefCell<Option<CommentMap>> = const { RefCell::new(None) };
 }
 
 pub fn set_thread_comment_map(comment_map: CommentMap) {
-    // TODO: use OnceCell to not leak?
-    let leaked_map: &'static CommentMap = Box::leak(Box::new(comment_map));
-
     THREAD_COMMENT_MAP.with(|cm| {
-        if cm.get().is_some() {
+        let mut comment_map_slot = cm.borrow_mut();
+        if comment_map_slot.is_some() {
             panic!("CommentMap is already set for this thread");
         }
-        cm.set(Some(leaked_map));
+        *comment_map_slot = Some(comment_map);
     });
 }
 
-pub fn get_comment_bucket(node_id: &usize) -> &CommentBucket {
-    get_comment_map()
-        .get(node_id)
-        .unwrap_or_else(|| panic!("## comment_map missing bucket for node: {}", node_id))
+pub fn clear_thread_comment_map() {
+    THREAD_COMMENT_MAP.with(|cm| cm.borrow_mut().take());
 }
 
-pub fn get_comment_map() -> &'static CommentMap {
-    THREAD_COMMENT_MAP.with(|cm| cm.get().expect("## CommentMap not set for this thread"))
+#[cfg(test)]
+pub fn thread_state_is_empty() -> bool {
+    let source_empty = THREAD_SOURCE_CODE.with(|sc| sc.borrow().is_none());
+    let comments_empty = THREAD_COMMENT_MAP.with(|cm| cm.borrow().is_none());
+    source_empty && comments_empty
+}
+
+pub fn get_comment_bucket(node_id: &usize) -> CommentBucket {
+    THREAD_COMMENT_MAP.with(|cm| {
+        cm.borrow()
+            .as_ref()
+            .and_then(|comment_map| comment_map.get(node_id))
+            .cloned()
+            .unwrap_or_else(|| panic!("## comment_map missing bucket for node: {}", node_id))
+    })
+}
+
+pub fn get_comment_map() -> CommentMap {
+    THREAD_COMMENT_MAP.with(|cm| {
+        cm.borrow()
+            .as_ref()
+            .cloned()
+            .expect("## CommentMap not set for this thread")
+    })
 }
 
 #[allow(dead_code)]
@@ -99,7 +132,7 @@ pub fn print_comment_map(tree: &Tree) {
     }
 }
 
-fn build_id_node_map(ast_tree: &Tree) -> HashMap<usize, Node> {
+fn build_id_node_map(ast_tree: &Tree) -> HashMap<usize, Node<'_>> {
     let mut cursor = ast_tree.walk();
     let mut node_map = HashMap::new();
 
@@ -120,7 +153,7 @@ fn build_id_node_map(ast_tree: &Tree) -> HashMap<usize, Node> {
 }
 
 pub fn assert_no_missing_comments() {
-    let missing_comments: Vec<&'static Comment> = get_comment_map()
+    let missing_comments: Vec<Comment> = get_comment_map()
         .values()
         .flat_map(|bucket| {
             bucket
@@ -129,7 +162,8 @@ pub fn assert_no_missing_comments() {
                 .chain(bucket.post_comments.iter())
                 .chain(bucket.dangling_comments.iter())
         })
-        .filter(|comment| !comment.is_printed())
+        .filter(|&comment| !comment.is_printed())
+        .cloned()
         .collect();
 
     if !missing_comments.is_empty() {
@@ -286,16 +320,16 @@ pub fn build_with_comments<'a, F>(
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
     let bucket = get_comment_bucket(&node_context.id);
-    handle_pre_comments(b, bucket, result);
+    handle_pre_comments(b, &bucket, result);
 
     if bucket.dangling_comments.is_empty() {
         handle_members(b, result);
     } else {
-        result.push(b.concat(handle_dangling_comments(b, bucket)));
+        result.push(b.concat(handle_dangling_comments(b, &bucket)));
         return;
     }
 
-    handle_post_comments(b, bucket, result);
+    handle_post_comments(b, &bucket, result);
 }
 
 pub fn build_with_comments_core<'a, F>(
@@ -307,12 +341,12 @@ pub fn build_with_comments_core<'a, F>(
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
     let bucket = get_comment_bucket(&node_context.id);
-    handle_pre_comments(b, bucket, result);
+    handle_pre_comments(b, &bucket, result);
 
     if bucket.dangling_comments.is_empty() {
         handle_members(b, result);
     } else {
-        result.push(b.concat(handle_dangling_comments(b, bucket)));
+        result.push(b.concat(handle_dangling_comments(b, &bucket)));
     }
 }
 
@@ -328,7 +362,7 @@ pub fn build_with_comments_and_punc<'a, F>(
 
     let bucket = get_comment_bucket(&node_context.id);
     if bucket.dangling_comments.is_empty() {
-        handle_post_comments(b, bucket, result);
+        handle_post_comments(b, &bucket, result);
     }
 
     if let Some(ref n) = node_context.punc {
@@ -354,7 +388,7 @@ pub fn build_with_comments_and_punc_attached<'a, F>(
     }
 
     if bucket.dangling_comments.is_empty() {
-        handle_post_comments(b, bucket, result);
+        handle_post_comments(b, &bucket, result);
     }
 }
 
@@ -594,4 +628,18 @@ pub fn is_bracket_composite_node(node: &Node) -> bool {
         node.kind(),
         "trigger_body" | "class_body" | "block" | "enum_body"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_snippet;
+
+    #[test]
+    fn truncate_snippet_never_splits_unicode() {
+        let snippet = format!("{}é", "a".repeat(79));
+        let truncated = truncate_snippet(&snippet);
+
+        assert_eq!(truncated, format!("{}…", "a".repeat(79)));
+        assert!(std::str::from_utf8(truncated.as_bytes()).is_ok());
+    }
 }
