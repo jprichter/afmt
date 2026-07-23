@@ -1,0 +1,8 @@
+# Battle-test selection mirrors the legacy find pruning while retaining afmt's
+# built-in repository exclusions.
+max_width = 80
+indent_size = 2
+
+[files]
+include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
+exclude = ["**/.git/**", "**/.sfdx/**", "**/node_modules/**", "**/scripts/**"]

@@ -13,6 +13,8 @@ REPO_LIST="$SCRIPT_DIR/repos.txt"
 TARGET_DIR="$SCRIPT_DIR/repos"
 FORMATTER_BINARY="$SCRIPT_DIR/../../target/debug/afmt"
 LOG_FILE="$SCRIPT_DIR/format_errors.log"
+BATTLE_CONFIG="$SCRIPT_DIR/.afmt.toml"
+BULK_ERROR_LOG="$SCRIPT_DIR/bulk_errors.log"
 
 # Enhanced error handling function
 handle_error() {
@@ -163,21 +165,64 @@ export -f format_files
 export -f idempotent_test
 export FORMATTER_BINARY
 export LOG_FILE
+export BATTLE_CONFIG
 # export LONG_LINES_LOG_FILE
 # export LINE_LENGTH
 
 # Record the start time
 START_TIME=$(date +%s)
 
-# Find all .cls and .trigger files and process them in parallel
-find "$TARGET_DIR" \( -type d \( -name ".sfdx" -o -name "scripts" \) \) -prune -o -type f \( -name "*.cls" -o -name "*.trigger" \) -print0 | \
-    parallel -0 -j+0 format_files
+# The normal path exercises one bulk invocation. Its output is redirected
+# because this script validates formatting success, not rendered source.
+# If the aggregate command fails, retain its stderr and run the legacy
+# per-file classifier so tolerated managed-package templates still work and
+# unexpected failures retain file-specific diagnostics.
+run_bulk_format() {
+    set +e
+    "$FORMATTER_BINARY" --config "$BATTLE_CONFIG" "$TARGET_DIR" \
+        > /dev/null 2> "$BULK_ERROR_LOG"
+    local exit_code=$?
+    set -e
+    return "$exit_code"
+}
+
+if ! run_bulk_format; then
+    echo "Bulk formatting reported failures; running diagnostic fallback."
+    cat "$BULK_ERROR_LOG"
+    find "$TARGET_DIR" \( -type d \( -name ".sfdx" -o -name "scripts" \) \) -prune -o \
+        -type f \( -name "*.cls" -o -name "*.trigger" -o -name "*.apex" -o -name "*.apexc" \) -print0 | \
+        parallel -0 -j+0 format_files
+fi
 
 # Run idempotent testing if mode is activated
 if [ "$IDEMPOTENT_MODE" = true ]; then
-    echo "Running idempotency tests..."
-    find "$TARGET_DIR" \( -type d \( -name ".sfdx" -o -name "scripts" \) \) -prune -o -type f \( -name "*.cls" -o -name "*.trigger" \) -print0 | \
-        parallel -0 -j+0 idempotent_test
+    echo "Running bulk write/check idempotency tests..."
+    IDEMPOTENT_WRITE_LOG="$SCRIPT_DIR/idempotent_write_errors.log"
+    IDEMPOTENT_CHECK_LOG="$SCRIPT_DIR/idempotent_check_errors.log"
+    : > "$IDEMPOTENT_WRITE_LOG"
+    : > "$IDEMPOTENT_CHECK_LOG"
+    set +e
+    "$FORMATTER_BINARY" --config "$BATTLE_CONFIG" --write "$TARGET_DIR" \
+        > /dev/null 2> "$IDEMPOTENT_WRITE_LOG"
+    WRITE_EXIT_CODE=$?
+    if [ "$WRITE_EXIT_CODE" -eq 0 ]; then
+        "$FORMATTER_BINARY" --config "$BATTLE_CONFIG" --check "$TARGET_DIR" \
+            > /dev/null 2> "$IDEMPOTENT_CHECK_LOG"
+        CHECK_EXIT_CODE=$?
+    else
+        CHECK_EXIT_CODE=1
+    fi
+    set -e
+
+    if [ "$WRITE_EXIT_CODE" -ne 0 ] || [ "$CHECK_EXIT_CODE" -ne 0 ]; then
+        echo "Bulk idempotency check reported failures; running detailed fallback."
+        cat "$IDEMPOTENT_WRITE_LOG" "$IDEMPOTENT_CHECK_LOG"
+        find "$TARGET_DIR" \( -type d \( -name ".sfdx" -o -name "scripts" \) \) -prune -o \
+            -type f \( -name "*.cls" -o -name "*.trigger" -o -name "*.apex" -o -name "*.apexc" \) -print0 | \
+            parallel -0 -j+0 idempotent_test
+    else
+        echo "Bulk write/check idempotency passed."
+    fi
 fi
 
 # find "$TARGET_DIR" -path "$TARGET_DIR/.sfdx" -prune -o -type f \( -name "*.cls" -o -name "*.trigger" \) -print0 | \
