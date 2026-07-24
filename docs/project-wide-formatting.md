@@ -9,12 +9,14 @@ more files or directories.
 - A directory is traversed recursively without following directory symlinks.
 - Eligible files use the `.cls`, `.trigger`, `.apex`, or `.apexc` extensions.
 - Explicit file inputs bypass the include globs, but exclusions still apply.
+- Exclusions also apply to explicit directory inputs; excluded directories are
+  pruned before descent and do not produce input or traversal errors.
 - Overlapping inputs are de-duplicated.
 - Results are processed in deterministic normalized path order.
 - All paths remain OS-native for file operations; glob matching uses portable
   `/` separators.
-- A missing, unsupported, or otherwise invalid input is reported before
-  formatting. An input set with no eligible files is an error.
+- A missing, unsupported, or otherwise invalid non-excluded input is reported
+  before formatting. An input set with no eligible files is an error.
 
 The default exclusions are `.git`, `.sfdx`, and `node_modules`. Directory
 symlinks are not followed during discovery. `afmt` does not read `.gitignore`.
@@ -51,8 +53,8 @@ afmt [OPTIONS] <PATH>...
 ```
 
 - Without `--write` or `--check`, formatted source is written to stdout.
-- A single-file invocation preserves the existing source-only output.
-- A multi-file or directory invocation separates each source block with a
+- A selection containing exactly one file prints plain formatted source.
+- A selection containing two or more files separates each source block with a
   deterministic `==> path <==` delimiter.
 - `--write` writes changed files in place and leaves unchanged files alone.
   Bulk writes are best effort: failures are reported with their paths while
