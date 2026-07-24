@@ -115,8 +115,10 @@ impl<'a> PrettyPrinter<'a> {
                 }
                 Doc::Softline => {
                     if chunk.flat {
-                        result.push(' ');
-                        self.col += 1;
+                        if !newline_buffer.is_pending() {
+                            result.push(' ');
+                            self.col += 1;
+                        }
                     } else {
                         newline_buffer.set_pending(chunk.indent);
                     }
