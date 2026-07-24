@@ -72,6 +72,7 @@ pub struct PrettyConfig {
     pub wrap_single_statements: bool,
     pub indent_style: IndentStyle,
     pub javadoc_star_column: JavadocStarColumn,
+    pub normalize_annotation_casing: bool,
 }
 
 impl PrettyConfig {
@@ -81,6 +82,7 @@ impl PrettyConfig {
         wrap_single_statements: bool,
         indent_style: IndentStyle,
         javadoc_star_column: JavadocStarColumn,
+        normalize_annotation_casing: bool,
     ) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
@@ -91,6 +93,7 @@ impl PrettyConfig {
                 wrap_single_statements,
                 indent_style,
                 javadoc_star_column,
+                normalize_annotation_casing,
             }
         }
     }
@@ -172,8 +175,10 @@ impl<'a> PrettyPrinter<'a> {
                 }
                 Doc::Softline => {
                     if chunk.flat {
-                        result.push(' ');
-                        self.col += 1;
+                        if !newline_buffer.is_pending() {
+                            result.push(' ');
+                            self.col += 1;
+                        }
                     } else {
                         newline_buffer.set_pending(chunk.indent);
                     }
@@ -254,7 +259,7 @@ impl<'a> PrettyPrinter<'a> {
                 for _ in 0..indent / self.indent_size {
                     result.push('\t');
                 }
-                self.col = indent / self.indent_size;
+                self.col = indent;
             }
         }
     }
