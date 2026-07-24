@@ -35,8 +35,17 @@ impl AfmtConfig {
         let content = std::fs::read_to_string(path).map_err(|error| {
             format!("Failed to read config file: {}: {}", path.display(), error)
         })?;
-        toml::from_str(&content)
-            .map_err(|error| format!("Failed to parse config file: {}: {}", path.display(), error))
+        let config: AfmtConfig = toml::from_str(&content).map_err(|error| {
+            format!("Failed to parse config file: {}: {}", path.display(), error)
+        })?;
+        config.formatter.validate().map_err(|error| {
+            format!(
+                "Invalid formatter configuration: {}: {}",
+                error,
+                path.display()
+            )
+        })?;
+        Ok(config)
     }
 
     pub fn load(path: Option<&Path>) -> Result<Self, String> {
@@ -114,5 +123,24 @@ mod tests {
 
         assert_eq!(config.files.include, FileSelectionConfig::default().include);
         assert!(config.files.exclude.is_empty());
+    }
+
+    #[test]
+    fn invalid_formatter_configuration_is_rejected_before_loading_targets() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("sf-afmt-invalid-config-{unique}"));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join(".afmt.toml");
+        std::fs::write(&path, "indent_size = 0\n").unwrap();
+
+        let error = AfmtConfig::from_file(&path).unwrap_err();
+
+        assert!(error.contains("Invalid formatter configuration"));
+        assert!(error.contains("indent_size must be at least 1"));
+        assert!(error.contains(&path.display().to_string()));
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
