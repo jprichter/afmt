@@ -11,6 +11,11 @@ class ConfigurableStyle {
 
   ConfigurableStyle() { initialized = 2; }
 
+  /** Runs the configured operation.
+   *
+   * @param value the input value
+   * @return the result value
+   */
   void run(Integer value) {
     if (value > 0) return; else if (value < 0) return; else return;
     for (Integer i = 0; i < value; i++) System.debug(i);

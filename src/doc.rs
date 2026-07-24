@@ -54,12 +54,24 @@ pub enum IndentStyle {
     Tab,
 }
 
+/// Placement of the leading star in JavaDoc continuation lines.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JavadocStarColumn {
+    /// Preserve afmt's existing ` *` continuation-line style.
+    #[default]
+    Offset,
+    /// Align continuation-line stars with the comment's indentation column.
+    Flush,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct PrettyConfig {
     pub indent_size: u32,
     pub brace_style: BraceStyle,
     pub wrap_single_statements: bool,
     pub indent_style: IndentStyle,
+    pub javadoc_star_column: JavadocStarColumn,
 }
 
 impl PrettyConfig {
@@ -68,6 +80,7 @@ impl PrettyConfig {
         brace_style: BraceStyle,
         wrap_single_statements: bool,
         indent_style: IndentStyle,
+        javadoc_star_column: JavadocStarColumn,
     ) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
@@ -77,6 +90,7 @@ impl PrettyConfig {
                 brace_style,
                 wrap_single_statements,
                 indent_style,
+                javadoc_star_column,
             }
         }
     }

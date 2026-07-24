@@ -30,6 +30,12 @@ class ConfigurableStyle
 		initialized = 2;
 	}
 
+	/**
+	* Runs the configured operation.
+	*
+	* @param value the input value
+	* @return the result value
+	*/
 	void run(Integer value)
 	{
 		if (value > 0)
