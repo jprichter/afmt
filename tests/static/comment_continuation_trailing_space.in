@@ -1,0 +1,7 @@
+public class T {
+	void m() {
+		String template = 'A' // first comment
+			+ 'B' // second comment
+			+ 'C'; // last comment
+	}
+}
