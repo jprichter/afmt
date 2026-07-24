@@ -134,6 +134,34 @@ mod tests {
         }
     }
 
+    #[test]
+    fn no_expected_output_has_trailing_whitespace() {
+        let fixture_dirs = ["tests/static", "tests/prettier80", "tests/comments"];
+        let mut offenders = Vec::new();
+
+        for directory in fixture_dirs {
+            for entry in std::fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|extension| extension.to_str()) != Some("cls") {
+                    continue;
+                }
+
+                let output = std::fs::read_to_string(&path).unwrap();
+                for (line_number, line) in output.lines().enumerate() {
+                    if line.ends_with(' ') || line.ends_with('\t') {
+                        offenders.push(format!("{}:{}", path.display(), line_number + 1));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            offenders.is_empty(),
+            "trailing whitespace in expected output:\n{}",
+            offenders.join("\n")
+        );
+    }
+
     fn run_scenario(dir_path: &str, scenario_name: &str) -> (u32, u32) {
         let mut total_tests = 0;
         let mut failed_tests = 0;
