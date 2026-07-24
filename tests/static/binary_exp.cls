@@ -3,9 +3,7 @@ class A {
     b > 1 && c > 1;
 
     queryLocator =
-      System
-        .Database
-        .getQueryLocator(
+      System.Database.getQueryLocator(
           [
             SELECT Id
             FROM Log__c
@@ -18,9 +16,7 @@ class A {
         );
 
     queryLocator =
-      System
-        .Database
-        .getQueryLocator(
+      System.Database.getQueryLocator(
           'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' + 'bbbbbbbbbbbbbbbbbbbbbbbbbbb'
         );
   }
