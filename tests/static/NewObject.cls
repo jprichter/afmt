@@ -7,8 +7,7 @@ class NewObject {
       );
     List<String> aCopy =
       new List<String>(
-        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-          .getOneSet()
+        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
           .getAnotherSet()
           .getYetAnotherSet()
       );
@@ -39,8 +38,7 @@ class NewObject {
       );
     Set<String> aCopy =
       new Set<String>(
-        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-          .getOneSet()
+        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
           .getAnotherSet()
           .getYetAnotherSet()
       );
@@ -66,8 +64,7 @@ class NewObject {
       );
     Map<String, String> aCopy =
       new Map<String, String>(
-        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-          .getOneSet()
+        superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
           .getAnotherSet()
           .getYetAnotherSet()
       );

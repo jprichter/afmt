@@ -761,6 +761,8 @@ impl<'a> DocBuild<'a> for TypeList {
 pub struct ChainingContext {
     pub is_parent_a_chaining_node: bool,
     pub is_top_most_in_a_chain: bool,
+    /// False when this node's own dot must stay glued to the text on its left.
+    pub can_break_before_dot: bool,
 }
 
 #[derive(Debug)]
@@ -828,7 +830,9 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
 
                 // potential chaining scenario
                 if let Some(context) = context {
-                    if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                    if (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
+                        && context.can_break_before_dot
+                    {
                         docs.push(b.maybeline());
                     }
 
@@ -2202,7 +2206,9 @@ impl<'a> DocBuild<'a> for FieldAccess {
             docs.push(self.object.build(b));
 
             if let Some(ref context) = self.context {
-                if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                if (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
+                    && context.can_break_before_dot
+                {
                     docs.push(b.maybeline());
                 }
             }

@@ -1,7 +1,6 @@
 class A {
   {
-    a2aaaaaaaaaaaaaaaaaa
-      .bbbbbbbbbbbbbbbbbbbb()
+    a2aaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbb()
       .cccccccccccccccccccccc(
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa()
           .bbbbbbbbbbbbbbbbbbbbbbbbbb()

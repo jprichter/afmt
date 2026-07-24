@@ -11,8 +11,7 @@ class A {
         '1111111111111111111111111111111111111111111111111111111111111111111111111111'
       ),
       t.a().b().c().d(),
-      superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-        .getOneSet()
+      superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
         .getAnotherSet()
         .getYetAnotherSet()
     );
@@ -21,8 +20,7 @@ class A {
       '1111111111111111111111111111111111111111111111111111111111111111111111111111'
     );
 
-    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-      .getOneSet()
+    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
       .getAnotherSet()
       .getYetAnotherSet();
     t.a().b().c().d();
@@ -32,8 +30,7 @@ class A {
       bbbbbbbbbbbbbbbbbbbbb
     );
 
-    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-      .getOne()
+    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOne()
       .getTwo(
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
         bbbbbbbbbbbbbbbbbbbbb

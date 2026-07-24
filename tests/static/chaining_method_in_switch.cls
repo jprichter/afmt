@@ -1,8 +1,7 @@
 class A {
   {
     switch on
-      SwitchCaseGenerator
-        .setType('Switch Type')
+      SwitchCaseGenerator.setType('Switch Type')
         .setMessage('The Most Important Message')
         .setSeverity('High')
         .getInstance() {

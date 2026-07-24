@@ -1,15 +1,12 @@
 class A {
   {
-    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-      .getOneSet()
+    superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
       .getAnotherSet()
       .getYetAnotherSet();
 
     t.a().b().c().d();
 
-    return generator
-      .objectBuilder
-      .setExternalId(account.personContactId)
+    return generator.objectBuilder.setExternalId(account.personContactId)
       .getInstance();
 
     String longResult =
@@ -31,8 +28,7 @@ class A {
         .callAnotherMethod()
         .getStringResult();
 
-    aaaaaaaaaaaaaaaaaaaaaaaaa
-      .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb[0]
+    aaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb[0]
       .cccccccccccccccccccccccccccccccccccccccccccccccc()
       .dddddddddddddd()
       .e();
