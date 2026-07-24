@@ -376,11 +376,46 @@ impl Annotation {
     }
 }
 
+fn canonical_annotation_name(name: &str) -> Option<&'static str> {
+    let lowercase_name = name.to_ascii_lowercase();
+
+    match lowercase_name.as_str() {
+        "istest" => Some("IsTest"),
+        "testsetup" => Some("TestSetup"),
+        "testvisible" => Some("TestVisible"),
+        "auraenabled" => Some("AuraEnabled"),
+        "future" => Some("Future"),
+        "invocablemethod" => Some("InvocableMethod"),
+        "invocablevariable" => Some("InvocableVariable"),
+        "httpget" => Some("HttpGet"),
+        "httppost" => Some("HttpPost"),
+        "httpput" => Some("HttpPut"),
+        "httppatch" => Some("HttpPatch"),
+        "httpdelete" => Some("HttpDelete"),
+        "restresource" => Some("RestResource"),
+        "readonly" => Some("ReadOnly"),
+        "remoteaction" => Some("RemoteAction"),
+        "deprecated" => Some("Deprecated"),
+        "suppresswarnings" => Some("SuppressWarnings"),
+        "namespaceaccessible" => Some("NamespaceAccessible"),
+        "jsonaccess" => Some("JsonAccess"),
+        _ => None,
+    }
+}
+
 impl<'a> DocBuild<'a> for Annotation {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt("@"));
-            result.push(self.name.build(b));
+            if b.normalizes_annotation_casing() {
+                if let Some(canonical_name) = canonical_annotation_name(&self.name.value) {
+                    self.name.build_value(b, result, canonical_name);
+                } else {
+                    result.push(self.name.build(b));
+                }
+            } else {
+                result.push(self.name.build(b));
+            }
 
             if let Some(a) = &self.arguments {
                 result.push(a.build(b));
@@ -764,6 +799,8 @@ impl<'a> DocBuild<'a> for TypeList {
 pub struct ChainingContext {
     pub is_parent_a_chaining_node: bool,
     pub is_top_most_in_a_chain: bool,
+    /// False when this node's own dot must stay glued to the text on its left.
+    pub can_break_before_dot: bool,
 }
 
 #[derive(Debug)]
@@ -837,7 +874,7 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                 if has_line_pre_comment {
                     docs.push(b.nl());
                     let mut hoisted_comments = Vec::new();
-                    handle_pre_comments(b, name_bucket, &mut hoisted_comments);
+                    handle_pre_comments(b, &name_bucket, &mut hoisted_comments);
                     docs.extend(hoisted_comments);
                 }
 
@@ -846,7 +883,7 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     let is_chaining =
                         context.is_parent_a_chaining_node || context.is_top_most_in_a_chain;
 
-                    if is_chaining && !has_line_pre_comment {
+                    if is_chaining && !has_line_pre_comment && context.can_break_before_dot {
                         docs.push(b.maybeline());
                     }
 
@@ -2290,7 +2327,9 @@ impl<'a> DocBuild<'a> for FieldAccess {
             docs.push(self.object.build(b));
 
             if let Some(ref context) = self.context {
-                if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                if (context.is_parent_a_chaining_node || context.is_top_most_in_a_chain)
+                    && context.can_break_before_dot
+                {
                     docs.push(b.maybeline());
                 }
             }
@@ -5704,9 +5743,9 @@ impl ValueNode {
 
         if bucket.dangling_comments.is_empty() {
             result.push(b.txt(&self.value));
-            handle_post_comments(b, bucket, &mut result);
+            handle_post_comments(b, &bucket, &mut result);
         } else {
-            result.push(b.concat(handle_dangling_comments(b, bucket)));
+            result.push(b.concat(handle_dangling_comments(b, &bucket)));
         }
 
         if let Some(ref punctuation) = self.node_context.punc {
@@ -5715,13 +5754,17 @@ impl ValueNode {
 
         b.concat(result)
     }
+
+    fn build_value<'a>(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>, value: &str) {
+        build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
+            result.push(b.txt(value));
+        });
+    }
 }
 
 impl<'a> DocBuild<'a> for ValueNode {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
-        build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(&self.value));
-        });
+        self.build_value(b, result, &self.value);
     }
 }
 
