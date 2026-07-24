@@ -4,6 +4,8 @@
 as a navigation aid for coding agents; put durable behavior details in the
 focused project documentation below.
 
+- Formatter configuration and style behavior:
+  [docs/configuration.md](docs/configuration.md)
 - Comment placement and formatter idempotency:
   [docs/comment-placement-and-idempotency.md](docs/comment-placement-and-idempotency.md)
 - User-facing bulk formatting, configuration, discovery, and CLI semantics:

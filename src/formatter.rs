@@ -1,6 +1,6 @@
 use crate::context::CommentMap;
 use crate::data_model::*;
-use crate::doc::{pretty_print, BraceStyle, IndentStyle, PrettyConfig};
+use crate::doc::{pretty_print, PrettyConfig};
 use crate::doc_builder::DocBuilder;
 use crate::message_helper::{red, yellow};
 use crate::utility::{
@@ -16,6 +16,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tree_sitter::{Node, Parser, Tree};
+
+pub use crate::doc::{BraceStyle, IndentStyle, JavadocStarColumn};
 
 #[allow(unused_imports)]
 use crate::utility::print_comment_map;
@@ -39,6 +41,10 @@ pub struct Config {
     /// Indentation character. Default `space`.
     #[serde(default)]
     pub indent_style: IndentStyle,
+
+    /// JavaDoc continuation-star placement. Default `offset` preserves output.
+    #[serde(default)]
+    pub javadoc_star_column: JavadocStarColumn,
 }
 
 fn default_max_width() -> u32 {
@@ -57,6 +63,7 @@ impl Default for Config {
             brace_style: BraceStyle::default(),
             wrap_single_statements: false,
             indent_style: IndentStyle::default(),
+            javadoc_star_column: JavadocStarColumn::default(),
         }
     }
 }
@@ -69,6 +76,7 @@ impl Config {
             brace_style: BraceStyle::default(),
             wrap_single_statements: false,
             indent_style: IndentStyle::default(),
+            javadoc_star_column: JavadocStarColumn::default(),
         }
     }
 
@@ -252,6 +260,7 @@ impl Formatter {
             config.brace_style,
             config.wrap_single_statements,
             config.indent_style,
+            config.javadoc_star_column,
         );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
@@ -345,7 +354,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{Config, Formatter};
-    use crate::doc::{BraceStyle, IndentStyle};
+    use crate::doc::{BraceStyle, IndentStyle, JavadocStarColumn};
     use rayon::prelude::*;
     #[cfg(unix)]
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};
@@ -589,18 +598,20 @@ mod tests {
 
         assert_eq!(config.brace_style, BraceStyle::KAndR);
         assert_eq!(config.indent_style, IndentStyle::Space);
+        assert_eq!(config.javadoc_star_column, JavadocStarColumn::Offset);
         assert!(!config.wrap_single_statements);
     }
 
     #[test]
     fn style_keys_parse_from_snake_case() {
         let config: Config = toml::from_str(
-            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\n",
+            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\njavadoc_star_column = \"flush\"\n",
         )
         .unwrap();
 
         assert_eq!(config.brace_style, BraceStyle::Allman);
         assert_eq!(config.indent_style, IndentStyle::Tab);
+        assert_eq!(config.javadoc_star_column, JavadocStarColumn::Flush);
         assert!(config.wrap_single_statements);
     }
 
@@ -614,6 +625,43 @@ mod tests {
     fn invalid_indent_style_is_an_error() {
         let result: Result<Config, _> = toml::from_str("indent_style = \"spaces\"\n");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn invalid_javadoc_star_column_is_an_error() {
+        let result: Result<Config, _> = toml::from_str("javadoc_star_column = \"aligned\"\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn flush_javadoc_stars_are_indented_and_idempotent() {
+        let source = "class T {\n  /**\n   * @param value the input\n   *\n   * @return the result\n   */\n  Integer m(Integer value) { /* keep */ return value; }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            indent_style: IndentStyle::Tab,
+            javadoc_star_column: JavadocStarColumn::Flush,
+            ..Config::default()
+        };
+
+        let first = std::thread::spawn({
+            let source = source.to_owned();
+            let config = config.clone();
+            move || Formatter::format_one(&source, config)
+        })
+        .join()
+        .unwrap();
+
+        assert!(
+            first.contains("\t/**\n\t* @param value the input\n\t*\n\t* @return the result\n\t*/")
+        );
+        assert!(first.contains("/* keep */"));
+        let second = std::thread::spawn({
+            let source = first.clone();
+            move || Formatter::format_one(&source, config)
+        })
+        .join()
+        .unwrap();
+        assert_eq!(second, first);
     }
 
     #[test]

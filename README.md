@@ -198,12 +198,18 @@ indent_size = 4
 # brace_style = "k_and_r"            # or "allman"
 # wrap_single_statements = false      # add braces to bare clause bodies
 # indent_style = "space"              # or "tab"
+# javadoc_star_column = "offset"      # or "flush"
 
 # Optional replacement selection arrays. Uncomment to customize them.
 # [files]
 # include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
 # exclude = ["**/.git/**", "**/.sfdx/**", "**/node_modules/**"]
 ```
+
+`javadoc_star_column = "flush"` aligns JavaDoc continuation stars with the
+comment's indentation column (`* content`); the default `"offset"` preserves
+afmt's existing style (` * content`). In either mode, afmt normalizes the
+separator after the star to one space.
 
 When `indent_style = "tab"`, `indent_size` controls the number of columns per
 indent level. Line wrapping measures each emitted tab as one logical column;
@@ -217,8 +223,10 @@ Each supplied include or exclude array replaces its corresponding default.
 Patterns use portable `/` separators and are matched relative to the config
 directory when possible.
 
-For the complete project-wide behavior and contributor validation workflow,
-see [the project-wide formatting guide](docs/project-wide-formatting.md) and
+See the [formatter configuration guide](docs/configuration.md) for the
+complete option behavior and defaults. For the complete project-wide behavior
+and contributor validation workflow, see
+[the project-wide formatting guide](docs/project-wide-formatting.md) and
 [the validation and benchmark guide](docs/validation-and-benchmarks.md).
 
 <br>
