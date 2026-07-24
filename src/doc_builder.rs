@@ -1,6 +1,6 @@
 use crate::{
     data_model::DocBuild,
-    doc::{Doc, DocRef, PrettyConfig},
+    doc::{BraceStyle, Doc, DocRef, PrettyConfig},
     enum_def::BodyMember,
 };
 use typed_arena::Arena;
@@ -220,6 +220,84 @@ impl<'a> DocBuilder<'a> {
     pub fn indent(&'a self, doc_ref: DocRef<'a>) -> DocRef<'a> {
         let relative_indent = self.config.indent_size;
         self.arena.alloc(Doc::Indent(relative_indent, doc_ref))
+    }
+
+    /// Separator emitted between a construct's header and its opening brace.
+    ///
+    /// This is the sole difference between K&R and Allman: a space keeps the
+    /// brace on the header line; a newline drops it to its own line at the
+    /// header's indent. Callers that currently push `b.txt(" ")` before a body
+    /// block should push this instead. Must not be placed inside a `group(...)`
+    /// (newlines don't compose with groups).
+    pub fn body_open_sep(&'a self) -> DocRef<'a> {
+        match self.config.brace_style {
+            BraceStyle::KAndR => self.txt(" "),
+            BraceStyle::Allman => self.nl(),
+        }
+    }
+
+    /// Separator between adjacent clauses such as `try`/`catch`/`finally`.
+    pub fn clause_sep(&'a self) -> DocRef<'a> {
+        self.body_open_sep()
+    }
+
+    /// Whether single-statement clause bodies are wrapped in synthesized braces.
+    pub fn wraps_single(&self) -> bool {
+        self.config.wrap_single_statements
+    }
+
+    /// Brace-wrap an already-built single (non-block) statement: separator +
+    /// `{` + indented statement + `}` on its own line. Honors `brace_style` via
+    /// `body_open_sep`.
+    fn wrap_single(&'a self, body: DocRef<'a>) -> DocRef<'a> {
+        self.concat(vec![
+            self.body_open_sep(),
+            self.txt("{"),
+            self.indent(self.nl()),
+            self.indent(body),
+            self.nl(),
+            self.txt("}"),
+        ])
+    }
+
+    /// Emit an empty brace block when single-statement bodies are enabled.
+    pub fn empty_clause_body(&'a self) -> DocRef<'a> {
+        if self.config.wrap_single_statements {
+            self.concat(vec![
+                self.body_open_sep(),
+                self.txt("{"),
+                self.nl(),
+                self.txt("}"),
+            ])
+        } else {
+            self.nil()
+        }
+    }
+
+    /// Emit a control-flow clause body (an `if`/`else`/loop body) with brace
+    /// placement and single-statement wrapping driven by config.
+    ///
+    /// - Block body: `body_open_sep` + the block (already brace-wrapped).
+    /// - Single statement + `wrap_single_statements`: synthesize a brace block.
+    /// - Single statement otherwise: the legacy brace-less form. `break_single`
+    ///   selects the fallback layout that must be preserved per construct:
+    ///   `true` puts the statement on its own indented line (`if` style),
+    ///   `false` keeps it inline after a space (loop style).
+    pub fn clause_body(
+        &'a self,
+        body: DocRef<'a>,
+        is_block: bool,
+        break_single: bool,
+    ) -> DocRef<'a> {
+        if is_block {
+            self.concat(vec![self.body_open_sep(), body])
+        } else if self.config.wrap_single_statements {
+            self.wrap_single(body)
+        } else if break_single {
+            self.concat(vec![self.indent(self.nl()), self.indent(body)])
+        } else {
+            self.concat(vec![self.txt(" "), body])
+        }
     }
 
     pub fn dedent(&'a self, doc_ref: DocRef<'a>) -> DocRef<'a> {
