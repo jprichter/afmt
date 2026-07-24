@@ -133,6 +133,10 @@ impl Comment {
     pub fn is_printed(&self) -> bool {
         self.is_printed.get()
     }
+
+    pub fn mark_as_inline_post_comment(&mut self) {
+        self.metadata.has_leading_content = true;
+    }
 }
 
 impl<'a> DocBuild<'a> for Comment {

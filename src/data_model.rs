@@ -1,6 +1,6 @@
 use crate::{
     accessor::Accessor,
-    context::{NodeContext, Punctuation},
+    context::{CommentType, NodeContext, Punctuation},
     doc::DocRef,
     doc_builder::{DocBuilder, Insertable},
     enum_def::*,
@@ -825,10 +825,25 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
             } => {
                 let mut docs = vec![];
                 docs.push(object.build(b));
+                let name_bucket = get_comment_bucket(&name.node_context.id);
+                let has_line_pre_comment = name_bucket
+                    .pre_comments
+                    .iter()
+                    .any(|comment| matches!(comment.comment_type, CommentType::Line));
+
+                if has_line_pre_comment {
+                    docs.push(b.nl());
+                    let mut hoisted_comments = Vec::new();
+                    handle_pre_comments(b, name_bucket, &mut hoisted_comments);
+                    docs.extend(hoisted_comments);
+                }
 
                 // potential chaining scenario
                 if let Some(context) = context {
-                    if context.is_parent_a_chaining_node || context.is_top_most_in_a_chain {
+                    let is_chaining =
+                        context.is_parent_a_chaining_node || context.is_top_most_in_a_chain;
+
+                    if is_chaining && !has_line_pre_comment {
                         docs.push(b.maybeline());
                     }
 
@@ -838,7 +853,11 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                         docs.push(n.build(b));
                     }
 
-                    docs.push(name.build(b));
+                    if has_line_pre_comment {
+                        docs.push(name.build_without_pre_comments(b));
+                    } else {
+                        docs.push(name.build(b));
+                    }
                     docs.push(arguments.build(b));
 
                     if context.is_top_most_in_a_chain {
@@ -852,7 +871,11 @@ impl<'a> DocBuild<'a> for MethodInvocationKind {
                     if let Some(ref n) = type_arguments {
                         docs.push(n.build(b));
                     }
-                    docs.push(name.build(b));
+                    if has_line_pre_comment {
+                        docs.push(name.build_without_pre_comments(b));
+                    } else {
+                        docs.push(name.build(b));
+                    }
                     docs.push(arguments.build(b));
                     result.push(b.concat(docs))
                 }
@@ -5588,6 +5611,24 @@ impl ValueNode {
             value: node.value(),
             node_context: NodeContext::with_punctuation(&node),
         }
+    }
+
+    fn build_without_pre_comments<'a>(&self, b: &'a DocBuilder<'a>) -> DocRef<'a> {
+        let bucket = get_comment_bucket(&self.node_context.id);
+        let mut result = Vec::new();
+
+        if bucket.dangling_comments.is_empty() {
+            result.push(b.txt(&self.value));
+            handle_post_comments(b, bucket, &mut result);
+        } else {
+            result.push(b.concat(handle_dangling_comments(b, bucket)));
+        }
+
+        if let Some(ref punctuation) = self.node_context.punc {
+            result.push(punctuation.build(b));
+        }
+
+        b.concat(result)
     }
 }
 
