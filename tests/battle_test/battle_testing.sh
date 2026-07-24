@@ -106,7 +106,7 @@ format_files() {
 
     # echo "Processing file: $FILE_PATH"
 
-    OUTPUT=$($FORMATTER_BINARY "$FILE_PATH" 2>&1)
+    OUTPUT=$($FORMATTER_BINARY --write "$FILE_PATH" 2>&1)
     EXIT_CODE=$?
 
     if [ $EXIT_CODE -ne 0 ]; then
@@ -161,8 +161,55 @@ idempotent_test() {
     rm -f "$TMP1" "$TMP2"
 }
 
+# Detect a line break before a dot when the preceding expression is a pure
+# dotted-identifier path. This is a syntactic guard against Apex interpreting
+# a type or namespace path as a variable reference. It intentionally
+# over-reports genuine variable heads; the formatter's structural rule glues
+# those dots too, so zero matches is the expected result.
+#
+# Known limitation: a head sharing its line with other tokens (for example
+# "return controller" followed by a broken dot) is not detected.
+name_path_break_check() {
+    python3 - "$TARGET_DIR" <<'PY'
+import os
+import re
+import sys
+
+root = sys.argv[1]
+path_pattern = re.compile(r"^[ \t]*[A-Za-z_][A-Za-z0-9_]*(\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*[ \t]*$")
+dot_pattern = re.compile(r"^[ \t]*\??\.[A-Za-z_]")
+violations = []
+
+for directory, _, filenames in os.walk(root):
+    for filename in filenames:
+        if not filename.endswith((".cls", ".trigger")):
+            continue
+        path = os.path.join(directory, filename)
+        with open(path, encoding="utf-8") as source_file:
+            lines = source_file.readlines()
+
+        for index, line in enumerate(lines):
+            if not dot_pattern.match(line) or index == 0:
+                continue
+            previous = index - 1
+            while previous >= 0 and not lines[previous].strip():
+                previous -= 1
+            if previous >= 0 and path_pattern.match(lines[previous]):
+                violations.append((path, previous + 1))
+
+if violations:
+    print(f"Name-path break check failed: {len(violations)} site(s)")
+    for path, line_number in violations:
+        print(f"  {path}:{line_number}")
+    raise SystemExit(1)
+
+print("Name-path break check passed: 0 sites")
+PY
+}
+
 export -f format_files
 export -f idempotent_test
+export -f name_path_break_check
 export FORMATTER_BINARY
 export LOG_FILE
 export BATTLE_CONFIG
@@ -225,6 +272,8 @@ if [ "$IDEMPOTENT_MODE" = true ]; then
     fi
 fi
 
+name_path_break_check
+
 # find "$TARGET_DIR" -path "$TARGET_DIR/.sfdx" -prune -o -type f \( -name "*.cls" -o -name "*.trigger" \) -print0 | \
 #     parallel -0 -j+0 format_files
 
@@ -242,4 +291,3 @@ else
     echo "Script execution time: $ELAPSED_TIME seconds"
     exit 0
 fi
-

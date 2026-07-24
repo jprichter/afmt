@@ -2,17 +2,13 @@ class Chaining {
   {
     [SELECT Id, Name FROM acc].super.a;
 
-    a
-      ?.super
+    a?.super
       .DuperVeryInsanelyLongVariableNameThatWillSurelyBreak
       .getOneSet()
       .getAnotherSet()
       .getYetAnotherSet();
 
-    a
-      .super
-      .DuperVeryInsanelyLongVariableNameThatWillSurelyBreak
-      .getOneSet()
+    a.super.DuperVeryInsanelyLongVariableNameThatWillSurelyBreak.getOneSet()
       .getAnotherSet()
       .getYetAnotherSet();
 
@@ -28,9 +24,7 @@ class Chaining {
       .getAnotherSet()
       .getYetAnotherSet();
 
-    a
-      .this
-      ?.superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
+    a.this?.superDuperVeryInsanelyLongVariableNameThatWillSurelyBreak
       .getOneSet()
       .getAnotherSet()
       .getYetAnotherSet();

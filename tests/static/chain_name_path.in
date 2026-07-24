@@ -1,0 +1,15 @@
+class NamePathChain {
+  void format() {
+    System
+      .Assert
+      .areEqual('expected value with enough text to overflow the configured width', 'actual value with enough text to overflow the configured width', 'message with enough text to overflow the configured width');
+
+    String.valueOf('a long value that forces the argument group to break').toUpperCase().trim();
+
+    someVariable.field.method('a long argument that forces a legal break after the value expression');
+    foo[0].bar('a long argument that forces a legal break after the subscript expression');
+    new Foo().bar('a long argument that forces a legal break after object creation');
+    String queryResultWithAnIntentionallyLongNameThatForcesBreak = [SELECT AReallyLongFieldNameThatForcesTheQueryToWrap__c, AnotherReallyLongFieldNameThatForcesTheQueryToWrap__c FROM AReallyLongObjectNameThatForcesTheQueryToWrap__c].size();
+    safeNavigationHeadWithAnIntentionallyLongNameThatForcesTheSafeNavigationChainToWrap?.b.c();
+  }
+}
