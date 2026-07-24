@@ -1,6 +1,6 @@
 use crate::context::CommentMap;
 use crate::data_model::*;
-use crate::doc::{pretty_print, PrettyConfig};
+use crate::doc::{pretty_print, BraceStyle, IndentStyle, PrettyConfig};
 use crate::doc_builder::DocBuilder;
 use crate::message_helper::{red, yellow};
 use crate::utility::{
@@ -27,6 +27,18 @@ pub struct Config {
 
     #[serde(default = "default_indent_size")]
     pub indent_size: u32,
+
+    /// Opening-brace placement. Default `k_and_r` preserves current output.
+    #[serde(default)]
+    pub brace_style: BraceStyle,
+
+    /// Wrap single-statement `if`/`else`/loop bodies in braces. Default `false`.
+    #[serde(default)]
+    pub wrap_single_statements: bool,
+
+    /// Indentation character. Default `space`.
+    #[serde(default)]
+    pub indent_style: IndentStyle,
 }
 
 fn default_max_width() -> u32 {
@@ -42,6 +54,9 @@ impl Default for Config {
         Self {
             max_width: default_max_width(),
             indent_size: default_indent_size(),
+            brace_style: BraceStyle::default(),
+            wrap_single_statements: false,
+            indent_style: IndentStyle::default(),
         }
     }
 }
@@ -51,6 +66,9 @@ impl Config {
         Self {
             max_width,
             indent_size: 2,
+            brace_style: BraceStyle::default(),
+            wrap_single_statements: false,
+            indent_style: IndentStyle::default(),
         }
     }
 
@@ -229,11 +247,16 @@ impl Formatter {
         let root: Root = enrich(&ast_tree);
 
         // traverse enriched data and create pretty print combinators
-        let c = PrettyConfig::new(config.indent_size);
+        let c = PrettyConfig::new(
+            config.indent_size,
+            config.brace_style,
+            config.wrap_single_statements,
+            config.indent_style,
+        );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 
-        let result = pretty_print(doc_ref, config.max_width);
+        let result = pretty_print(doc_ref, config.max_width, c);
 
         // debugging tool: use this to print named node value + comments in bucket
         // print_comment_map(&ast_tree);
@@ -322,6 +345,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{Config, Formatter};
+    use crate::doc::{BraceStyle, IndentStyle};
     use rayon::prelude::*;
     #[cfg(unix)]
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};
@@ -487,6 +511,7 @@ mod tests {
             Config {
                 max_width: 80,
                 indent_size: 0,
+                ..Config::default()
             },
         )
         .expect_err("invalid formatter configuration should panic in the formatter");
@@ -556,5 +581,154 @@ mod tests {
         let error = outcome.result.expect_err("missing input should fail");
         assert_eq!(error.path, path);
         assert!(error.message.contains("Failed to read file"));
+    }
+
+    #[test]
+    fn style_keys_default_when_omitted() {
+        let config: Config = toml::from_str("max_width = 80\n").unwrap();
+
+        assert_eq!(config.brace_style, BraceStyle::KAndR);
+        assert_eq!(config.indent_style, IndentStyle::Space);
+        assert!(!config.wrap_single_statements);
+    }
+
+    #[test]
+    fn style_keys_parse_from_snake_case() {
+        let config: Config = toml::from_str(
+            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\n",
+        )
+        .unwrap();
+
+        assert_eq!(config.brace_style, BraceStyle::Allman);
+        assert_eq!(config.indent_style, IndentStyle::Tab);
+        assert!(config.wrap_single_statements);
+    }
+
+    #[test]
+    fn invalid_brace_style_is_an_error() {
+        let result: Result<Config, _> = toml::from_str("brace_style = \"stroustrup\"\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn invalid_indent_style_is_an_error() {
+        let result: Result<Config, _> = toml::from_str("indent_style = \"spaces\"\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn allman_moves_container_and_control_braces_to_their_own_line() {
+        let source = "class T {\n  void m() {\n    if (a) { x(); }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(
+            out,
+            "class T\n{\n  void m()\n  {\n    if (a)\n    {\n      x();\n    }\n  }\n}\n"
+        );
+    }
+
+    #[test]
+    fn wrap_single_statements_adds_braces_to_bare_clause_bodies() {
+        let source = "class T {\n  void m() {\n    if (a) x(); else y();\n    for (Account acc : accts) z();\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        // Bare `if`/`else` and loop bodies each gain a brace block; else-if stays
+        // inline (none here). K&R placement is preserved (default brace_style).
+        assert!(out.contains("if (a) {\n      x();\n    } else {\n      y();\n    }"));
+        assert!(out.contains("for (Account acc : accts) {\n      z();\n    }"));
+    }
+
+    #[test]
+    fn tab_indentation_is_independent_of_brace_style_and_wrapping() {
+        let source = "class T {\n  void m() {\n    if (a) x();\n  }\n}\n";
+        let config = Config {
+            indent_style: IndentStyle::Tab,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(
+            out,
+            "class T {\n\tvoid m() {\n\t\tif (a)\n\t\t\tx();\n\t}\n}\n"
+        );
+    }
+
+    #[test]
+    fn allman_applies_to_properties_and_accessor_bodies() {
+        let source = "public class Me {\n  public integer prop {\n    get {\n      return prop;\n    }\n    set {\n      prop = value;\n    }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("public integer prop\n  {"));
+        assert!(out.contains("get\n    {"));
+        assert!(out.contains("set\n    {"));
+    }
+
+    #[test]
+    fn wrapped_single_statements_include_empty_loop_bodies() {
+        let source = "class T {\n  void m() {\n    for (Integer i = 0; i < 1; i++);\n    for (Account acc : accts);\n    while (true);\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(out.matches("{\n    }").count(), 3);
+    }
+
+    #[test]
+    fn wrapped_empty_while_preserves_terminator_comments() {
+        let source = "class T {\n  void m() {\n    while (true) /* while empty */ ;\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("/* while empty */"));
+        assert!(out.contains("while (true) /* while empty */"));
+    }
+
+    #[test]
+    fn allman_places_catch_and_finally_on_new_lines() {
+        let source = "class T {\n  void m() {\n    try {\n      work();\n    } catch (Exception e) {\n      recover();\n    } finally {\n      finish();\n    }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("    }\n    catch (Exception e)\n    {"));
+        assert!(out.contains("    }\n    finally\n    {"));
+    }
+
+    #[test]
+    fn default_config_keeps_k_and_r_and_bare_bodies() {
+        let source = "class T {\n  void m() {\n    if (a) x();\n  }\n}\n";
+
+        let out = Formatter::format_one(source, Config::default());
+
+        assert_eq!(
+            out,
+            "class T {\n  void m() {\n    if (a)\n      x();\n  }\n}\n"
+        );
     }
 }

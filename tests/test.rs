@@ -28,6 +28,12 @@ mod tests {
     }
 
     #[test]
+    fn configurable_style() {
+        let (total, failed) = run_scenario("tests/configurable_style", "configurable_style");
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
     fn idempotency_static() {
         run_idempotency("tests/static", "static", "tests/configs/.afmt_static.toml");
     }
@@ -47,6 +53,15 @@ mod tests {
             "tests/comments",
             "comments",
             "tests/configs/.afmt_static.toml",
+        );
+    }
+
+    #[test]
+    fn idempotency_configurable_style() {
+        run_idempotency(
+            "tests/configurable_style",
+            "configurable_style",
+            "tests/configs/.afmt_configurable_style.toml",
         );
     }
 
@@ -170,6 +185,7 @@ mod tests {
             "static" => run_static_test_files(source),
             "prettier80" => run_prettier_test_files(source, "p80"),
             "comments" => run_static_test_files(source),
+            "configurable_style" => run_configurable_style_test_files(source),
             _ => panic!("Unknown scenario: {}", scenario_name),
         });
 
@@ -198,6 +214,19 @@ mod tests {
         });
 
         compare("Static:", output, expected, source)
+    }
+
+    fn run_configurable_style_test_files(source: &Path) -> bool {
+        let expected_file = source.with_extension("cls");
+        let output = format_with_afmt(source, Some("tests/configs/.afmt_configurable_style.toml"));
+        let expected = std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
+            panic!(
+                "Failed to read expected .cls file at {}",
+                red(&expected_file.to_string_lossy())
+            )
+        });
+
+        compare("Configurable style:", output, expected, source)
     }
 
     fn run_prettier_test_files(source: &Path, config_name: &str) -> bool {
@@ -281,14 +310,6 @@ mod tests {
             .next()
             .and_then(|result| result.ok())
             .expect("format result failed.")
-    }
-
-    fn format_source(source: &str, config: &Config) -> String {
-        let source = source.to_owned();
-        let config = config.clone();
-        std::thread::spawn(move || Formatter::format_one(&source, config))
-            .join()
-            .expect("format thread panicked")
     }
 
     fn print_side_by_side_diff(against: &str, output: &str, expected: &str) {
