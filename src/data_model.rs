@@ -514,7 +514,7 @@ impl<'a> DocBuild<'a> for FieldDeclaration {
             result.push(doc);
 
             if let Some(ref n) = self.accessor_list {
-                result.push(b.txt(" "));
+                result.push(b.body_open_sep());
                 result.push(n.build(b));
             }
         });
@@ -1362,11 +1362,15 @@ impl<'a> DocBuild<'a> for IfStatement {
 
             // Consequence body. `if` style: a brace-less single statement breaks
             // onto its own indented line.
-            result.push(b.clause_body(
-                self.consequence.build(b),
-                self.consequence.is_block(),
-                true,
-            ));
+            if matches!(self.consequence, Statement::SemiColumn) && b.wraps_single() {
+                result.push(b.empty_clause_body());
+            } else {
+                result.push(b.clause_body(
+                    self.consequence.build(b),
+                    self.consequence.is_block(),
+                    true,
+                ));
+            }
 
             // Did the consequence render a closing brace on its own line — a real
             // block, or a single statement we wrapped in braces?
@@ -1397,7 +1401,11 @@ impl<'a> DocBuild<'a> for IfStatement {
                     // after a braced consequence it hugs the line (`} else y;`),
                     // after a brace-less one it breaks (`else\n  y;`).
                     _ => {
-                        result.push(b.clause_body(alt.statement.build(b), false, !cons_braced));
+                        if matches!(alt.statement, Statement::SemiColumn) && b.wraps_single() {
+                            result.push(b.empty_clause_body());
+                        } else {
+                            result.push(b.clause_body(alt.statement.build(b), false, !cons_braced));
+                        }
                     }
                 }
             }
@@ -1417,6 +1425,24 @@ impl ParenthesizedExpression {
             exp: Expression::new(node.first_c()),
             node_context: NodeContext::with_punctuation(&node),
         }
+    }
+
+    pub fn build_without_punctuation<'a>(&self, b: &'a DocBuilder<'a>) -> DocRef<'a> {
+        let mut result = Vec::new();
+        build_with_comments(b, &self.node_context, &mut result, |b, result| {
+            result.push(b.txt("("));
+            let doc = b.concat(vec![
+                b.indent(b.maybeline()),
+                b.indent(self.exp.build(b)),
+                b.maybeline(),
+            ]);
+            result.push(b.group(doc));
+            result.push(b.txt(")"));
+        });
+        if let Some(ref punctuation) = self.node_context.punc {
+            punctuation.build_comments(b, &mut result);
+        }
+        b.concat(result)
     }
 }
 
@@ -1561,7 +1587,13 @@ impl<'a> DocBuild<'a> for ForStatement {
             result.push(doc);
 
             match self.body {
-                Statement::SemiColumn => result.push(b.txt(";")),
+                Statement::SemiColumn => {
+                    if b.wraps_single() {
+                        result.push(b.empty_clause_body());
+                    } else {
+                        result.push(b.txt(";"));
+                    }
+                }
                 _ => {
                     // Loop style: a brace-less single body stays inline.
                     result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
@@ -1610,7 +1642,13 @@ impl<'a> DocBuild<'a> for EnhancedForStatement {
             result.push(self.value.build(b));
             result.push(b.txt(")"));
             match self.body {
-                Statement::SemiColumn => result.push(b.txt(";")),
+                Statement::SemiColumn => {
+                    if b.wraps_single() {
+                        result.push(b.empty_clause_body());
+                    } else {
+                        result.push(b.txt(";"));
+                    }
+                }
                 _ => {
                     // Loop style: a brace-less single body stays inline.
                     result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
@@ -2070,7 +2108,7 @@ impl<'a> DocBuild<'a> for RunAsStatement {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(b.txt("System.runAs"));
             result.push(self.user.build(b));
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.block.build(b));
         });
     }
@@ -2132,10 +2170,17 @@ impl<'a> DocBuild<'a> for WhileStatement {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments(b, &self.node_context, result, |b, result| {
             result.push(b.txt_("while"));
-            result.push(self.condition.build(b));
+            let condition = if matches!(self.body, Statement::SemiColumn) && b.wraps_single() {
+                self.condition.build_without_punctuation(b)
+            } else {
+                self.condition.build(b)
+            };
+            result.push(condition);
 
             match self.body {
-                Statement::SemiColumn => {}
+                Statement::SemiColumn => {
+                    result.push(b.empty_clause_body());
+                }
                 _ => {
                     // Loop style: a brace-less single body stays inline.
                     result.push(b.clause_body(self.body.build(b), self.body.is_block(), false));
@@ -2303,11 +2348,12 @@ impl<'a> DocBuild<'a> for EnumDeclaration {
             }
             result.push(b.txt_("enum"));
             result.push(self.name.build(b));
-            result.push(b.txt(" "));
 
             if let Some(ref n) = self.interface {
+                result.push(b.txt(" "));
                 result.push(n.build(b));
             }
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -2871,7 +2917,8 @@ impl TryStatement {
 impl<'a> DocBuild<'a> for TryStatement {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt_("try"));
+            result.push(b.txt("try"));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
             result.push(self.tail.build(b));
         });
@@ -2888,14 +2935,21 @@ impl<'a> DocBuild<'a> for TryStatementTail {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         match self {
             Self::Catches(v) => {
-                let docs = b.to_docs(v);
+                let docs: Vec<DocRef<'a>> = v
+                    .iter()
+                    .flat_map(|catch| [b.clause_sep(), catch.build(b)])
+                    .collect();
                 let catches_doc = b.concat(docs);
                 result.push(catches_doc);
             }
             Self::CatchesFinally(v, f) => {
-                let docs = b.to_docs(v);
+                let docs: Vec<DocRef<'a>> = v
+                    .iter()
+                    .flat_map(|catch| [b.clause_sep(), catch.build(b)])
+                    .collect();
                 let catches_doc = b.concat(docs);
                 result.push(catches_doc);
+                result.push(b.clause_sep());
                 result.push(f.build(b));
             }
         }
@@ -2924,11 +2978,12 @@ impl CatchClause {
 impl<'a> DocBuild<'a> for CatchClause {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b._txt_("catch"));
+            result.push(b.txt("catch "));
 
             result.push(b.txt("("));
             result.push(self.formal_parameter.build(b));
-            result.push(b.txt_(")"));
+            result.push(b.txt(")"));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -2954,7 +3009,8 @@ impl FinallyClause {
 impl<'a> DocBuild<'a> for FinallyClause {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b._txt_("finally"));
+            result.push(b.txt("finally"));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -2978,7 +3034,8 @@ impl StaticInitializer {
 impl<'a> DocBuild<'a> for StaticInitializer {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt_("static"));
+            result.push(b.txt("static"));
+            result.push(b.body_open_sep());
             result.push(self.block.build(b));
         });
     }
@@ -3278,7 +3335,7 @@ impl<'a> DocBuild<'a> for AccessorDeclaration {
             result.push(b.txt(&self.accessor));
 
             if let Some(ref n) = self.body {
-                result.push(b.txt(" "));
+                result.push(b.body_open_sep());
                 result.push(n.build(b));
             }
         });
@@ -3448,7 +3505,7 @@ impl<'a> DocBuild<'a> for SwitchExpression {
             let docs = vec![b.txt("switch on"), b.softline(), self.condition.build(b)];
             let doc = b.group_indent_concat(docs);
             result.push(doc);
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.body.build(b));
         });
     }
@@ -3514,7 +3571,7 @@ impl<'a> DocBuild<'a> for SwitchRule {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
             result.push(self.label.build(b));
-            result.push(b.txt(" "));
+            result.push(b.body_open_sep());
             result.push(self.block.build(b));
         });
     }

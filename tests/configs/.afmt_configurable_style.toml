@@ -1,0 +1,5 @@
+max_width = 80
+indent_size = 4
+brace_style = "allman"
+wrap_single_statements = true
+indent_style = "tab"

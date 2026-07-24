@@ -28,6 +28,9 @@ remain valid:
 ```toml
 max_width = 80
 indent_size = 4
+brace_style = "k_and_r"            # or "allman"
+wrap_single_statements = false      # add braces to bare clause bodies
+indent_style = "space"              # or "tab"
 
 [files]
 include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
@@ -38,6 +41,26 @@ The `[files].include` and `[files].exclude` arrays replace their respective
 defaults when supplied; they do not merge with them. Exclusions always win
 over inclusions. Invalid glob syntax is a configuration error and prevents
 formatting.
+
+The style keys are independent and default to afmt's existing K&R braces,
+brace-less single-statement clauses, and space indentation. With
+`indent_style = "tab"`, `indent_size` controls the number of columns per indent
+level. Line wrapping measures each emitted tab as one logical column, so visual
+tab stops may differ from `max_width` calculations.
+
+Allman formatting places property and accessor body braces on their own lines.
+Compact auto-properties without accessor bodies keep their `{ get; set; }`
+contents on one line.
+
+With `brace_style = "allman"`, opening braces also move to their own lines for
+classes, interfaces, enums, methods, constructors, triggers, static
+initializers, control-flow blocks, `try`/`catch`/`finally`, `switch` blocks and
+rules, and `System.runAs` blocks. `brace_style = "k_and_r"` preserves the
+default same-line placement. With `wrap_single_statements = true`, bare
+single statements in `if`/`else`, classic and enhanced `for`, `while`, and
+`do` clauses receive brace blocks; existing blocks are not double-wrapped and
+`else if` chains remain inline. Empty clause statements become empty blocks
+so the result remains idempotent.
 
 Patterns are matched against paths relative to the config file's parent when
 `--config` is supplied, or relative to the process working directory when no

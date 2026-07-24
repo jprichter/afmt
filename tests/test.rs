@@ -28,6 +28,16 @@ mod tests {
     }
 
     #[test]
+    fn configurable_style() {
+        let (total, failed) = run_scenario_with_config(
+            "tests/configurable_style",
+            "configurable_style",
+            "tests/configs/.afmt_configurable_style.toml",
+        );
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
     fn idempotency_static() {
         run_idempotency("tests/static", "static", "tests/configs/.afmt_static.toml");
     }
@@ -47,6 +57,15 @@ mod tests {
             "tests/comments",
             "comments",
             "tests/configs/.afmt_static.toml",
+        );
+    }
+
+    #[test]
+    fn idempotency_configurable_style() {
+        run_idempotency(
+            "tests/configurable_style",
+            "configurable_style",
+            "tests/configs/.afmt_configurable_style.toml",
         );
     }
 
@@ -88,6 +107,14 @@ mod tests {
     }
 
     fn run_scenario(dir_path: &str, scenario_name: &str) -> (u32, u32) {
+        run_scenario_with_config(dir_path, scenario_name, "tests/configs/.afmt_static.toml")
+    }
+
+    fn run_scenario_with_config(
+        dir_path: &str,
+        scenario_name: &str,
+        config_path: &str,
+    ) -> (u32, u32) {
         let mut total_tests = 0;
         let mut failed_tests = 0;
 
@@ -96,7 +123,7 @@ mod tests {
             let source = entry.path();
             if source.extension().and_then(|ext| ext.to_str()) == Some("in") {
                 total_tests += 1;
-                if !run_test_file(&source, scenario_name) {
+                if !run_test_file(&source, scenario_name, config_path) {
                     failed_tests += 1;
                 }
             }
@@ -164,12 +191,13 @@ mod tests {
         }
     }
 
-    fn run_test_file(source: &Path, scenario_name: &str) -> bool {
+    fn run_test_file(source: &Path, scenario_name: &str, config_path: &str) -> bool {
         // Wrap the "actual" test in a catch_unwind:
         let result = std::panic::catch_unwind(|| match scenario_name {
-            "static" => run_static_test_files(source),
+            "static" => run_configured_test_files(source, "tests/configs/.afmt_static.toml"),
             "prettier80" => run_prettier_test_files(source, "p80"),
-            "comments" => run_static_test_files(source),
+            "comments" => run_configured_test_files(source, "tests/configs/.afmt_static.toml"),
+            "configurable_style" => run_configured_test_files(source, config_path),
             _ => panic!("Unknown scenario: {}", scenario_name),
         });
 
@@ -187,9 +215,9 @@ mod tests {
         }
     }
 
-    fn run_static_test_files(source: &Path) -> bool {
+    fn run_configured_test_files(source: &Path, config_path: &str) -> bool {
         let expected_file = source.with_extension("cls");
-        let output = format_with_afmt(source, Some("tests/configs/.afmt_static.toml"));
+        let output = format_with_afmt(source, Some(config_path));
         let expected = std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
             panic!(
                 "Failed to read expected .cls file at {}",

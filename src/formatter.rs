@@ -33,11 +33,10 @@ pub struct Config {
     pub brace_style: BraceStyle,
 
     /// Wrap single-statement `if`/`else`/loop bodies in braces. Default `false`.
-    /// Consumed in a later step; carried here so the config surface is complete.
     #[serde(default)]
     pub wrap_single_statements: bool,
 
-    /// Indentation character. Default `space`. Consumed in a later step.
+    /// Indentation character. Default `space`.
     #[serde(default)]
     pub indent_style: IndentStyle,
 }
@@ -252,11 +251,12 @@ impl Formatter {
             config.indent_size,
             config.brace_style,
             config.wrap_single_statements,
+            config.indent_style,
         );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 
-        let result = pretty_print(doc_ref, config.max_width);
+        let result = pretty_print(doc_ref, config.max_width, c);
 
         // debugging tool: use this to print named node value + comments in bucket
         // print_comment_map(&ast_tree);
@@ -345,6 +345,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{BraceStyle, Config, Formatter};
+    use crate::doc::IndentStyle;
     use rayon::prelude::*;
     #[cfg(unix)]
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};
@@ -599,6 +600,78 @@ mod tests {
         // inline (none here). K&R placement is preserved (default brace_style).
         assert!(out.contains("if (a) {\n      x();\n    } else {\n      y();\n    }"));
         assert!(out.contains("for (Account acc : accts) {\n      z();\n    }"));
+    }
+
+    #[test]
+    fn tab_indentation_is_independent_of_brace_style_and_wrapping() {
+        let source = "class T {\n  void m() {\n    if (a) x();\n  }\n}\n";
+        let config = Config {
+            indent_style: IndentStyle::Tab,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(
+            out,
+            "class T {\n\tvoid m() {\n\t\tif (a)\n\t\t\tx();\n\t}\n}\n"
+        );
+    }
+
+    #[test]
+    fn allman_applies_to_properties_and_accessor_bodies() {
+        let source = "public class Me {\n  public integer prop {\n    get {\n      return prop;\n    }\n    set {\n      prop = value;\n    }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("public integer prop\n  {"));
+        assert!(out.contains("get\n    {"));
+        assert!(out.contains("set\n    {"));
+    }
+
+    #[test]
+    fn wrapped_single_statements_include_empty_loop_bodies() {
+        let source = "class T {\n  void m() {\n    for (Integer i = 0; i < 1; i++);\n    for (Account acc : accts);\n    while (true);\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert_eq!(out.matches("{\n    }").count(), 3);
+    }
+
+    #[test]
+    fn wrapped_empty_while_preserves_terminator_comments() {
+        let source = "class T {\n  void m() {\n    while (true) /* while empty */ ;\n  }\n}\n";
+        let config = Config {
+            wrap_single_statements: true,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("/* while empty */"));
+        assert!(out.contains("while (true) /* while empty */"));
+    }
+
+    #[test]
+    fn allman_places_catch_and_finally_on_new_lines() {
+        let source = "class T {\n  void m() {\n    try {\n      work();\n    } catch (Exception e) {\n      recover();\n    } finally {\n      finish();\n    }\n  }\n}\n";
+        let config = Config {
+            brace_style: BraceStyle::Allman,
+            ..Config::default()
+        };
+
+        let out = Formatter::format_one(source, config);
+
+        assert!(out.contains("    }\n    catch (Exception e)\n    {"));
+        assert!(out.contains("    }\n    finally\n    {"));
     }
 
     #[test]

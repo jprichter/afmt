@@ -194,6 +194,11 @@ max_width = 80
 # Indentation size in spaces
 indent_size = 4
 
+# Optional style controls (defaults preserve afmt's existing output)
+# brace_style = "k_and_r"            # or "allman"
+# wrap_single_statements = false      # add braces to bare clause bodies
+# indent_style = "space"              # or "tab"
+
 # Optional replacement selection arrays. Uncomment to customize them.
 # [files]
 # include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
@@ -203,6 +208,14 @@ indent_size = 4
 Each supplied include or exclude array replaces its corresponding default.
 Patterns use portable `/` separators and are matched relative to the config
 directory when possible.
+
+When `indent_style = "tab"`, `indent_size` controls the number of columns per
+indent level. Line wrapping measures each emitted tab as one logical column;
+visual tab stops may therefore differ from `max_width` calculations.
+
+Allman formatting places property and accessor body braces on their own lines.
+Compact auto-properties without accessor bodies keep their `{ get; set; }`
+contents on one line.
 
 For the complete project-wide behavior and contributor validation workflow,
 see [the project-wide formatting guide](docs/project-wide-formatting.md) and

@@ -143,4 +143,10 @@ mod tests {
         let result: Result<AfmtConfig, _> = toml::from_str("brace_style = \"stroustrup\"\n");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn invalid_indent_style_is_an_error() {
+        let result: Result<AfmtConfig, _> = toml::from_str("indent_style = \"spaces\"\n");
+        assert!(result.is_err());
+    }
 }

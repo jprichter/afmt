@@ -1,7 +1,7 @@
 pub type DocRef<'a> = &'a Doc<'a>;
 
-pub fn pretty_print(doc_ref: DocRef, max_width: u32) -> String {
-    let mut printer = PrettyPrinter::new(doc_ref, max_width);
+pub fn pretty_print(doc_ref: DocRef, max_width: u32, config: PrettyConfig) -> String {
+    let mut printer = PrettyPrinter::new(doc_ref, max_width, config);
     printer.print()
 }
 
@@ -23,6 +23,8 @@ pub enum Doc<'a> {
 
 struct PrettyPrinter<'a> {
     max_width: u32,
+    indent_size: u32,
+    indent_style: IndentStyle,
     col: u32,
     chunks: Vec<Chunk<'a>>,
 }
@@ -43,8 +45,7 @@ pub enum BraceStyle {
     Allman,
 }
 
-/// Indentation character. Consumed by the printer in a later step; carried here
-/// so the config surface is complete.
+/// Indentation character used when materializing pending newlines.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IndentStyle {
@@ -53,14 +54,21 @@ pub enum IndentStyle {
     Tab,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct PrettyConfig {
     pub indent_size: u32,
     pub brace_style: BraceStyle,
     pub wrap_single_statements: bool,
+    pub indent_style: IndentStyle,
 }
 
 impl PrettyConfig {
-    pub fn new(indent_size: u32, brace_style: BraceStyle, wrap_single_statements: bool) -> Self {
+    pub fn new(
+        indent_size: u32,
+        brace_style: BraceStyle,
+        wrap_single_statements: bool,
+        indent_style: IndentStyle,
+    ) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
         } else {
@@ -68,6 +76,7 @@ impl PrettyConfig {
                 indent_size,
                 brace_style,
                 wrap_single_statements,
+                indent_style,
             }
         }
     }
@@ -112,7 +121,7 @@ impl<'a> Chunk<'a> {
 }
 
 impl<'a> PrettyPrinter<'a> {
-    fn new(doc_ref: DocRef<'a>, max_width: u32) -> Self {
+    fn new(doc_ref: DocRef<'a>, max_width: u32, config: PrettyConfig) -> Self {
         let chunk = Chunk {
             doc_ref,
             indent: 0,
@@ -121,6 +130,8 @@ impl<'a> PrettyPrinter<'a> {
 
         Self {
             max_width,
+            indent_size: config.indent_size,
+            indent_style: config.indent_style,
             col: 0,
             chunks: vec![chunk],
         }
@@ -218,10 +229,20 @@ impl<'a> PrettyPrinter<'a> {
 
     fn insert_newline_with_indent(&mut self, result: &mut String, indent: u32) {
         result.push('\n');
-        for _ in 0..indent {
-            result.push(' ');
+        match self.indent_style {
+            IndentStyle::Space => {
+                for _ in 0..indent {
+                    result.push(' ');
+                }
+                self.col = indent;
+            }
+            IndentStyle::Tab => {
+                for _ in 0..indent / self.indent_size {
+                    result.push('\t');
+                }
+                self.col = indent / self.indent_size;
+            }
         }
-        self.col = indent;
     }
 
     //fn insert_newline_with_indent(&mut self, result: &mut String, chunk: &Chunk) {

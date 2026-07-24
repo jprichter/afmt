@@ -1,0 +1,109 @@
+class ConfigurableStyle
+{
+	enum Season
+	{
+		WINTER,
+		SPRING
+	}
+
+	public Integer property
+	{
+		get
+		{
+			return property;
+		}
+		set
+		{
+			property = value;
+		}
+	}
+	public Integer autoProperty
+	{ get; set; }
+
+	static
+	{
+		Integer initialized = 1;
+	}
+
+	ConfigurableStyle()
+	{
+		initialized = 2;
+	}
+
+	void run(Integer value)
+	{
+		if (value > 0)
+		{
+			return;
+		}
+		else if (value < 0)
+		{
+			return;
+		}
+		else
+		{
+			return;
+		}
+		for (Integer i = 0; i < value; i++)
+		{
+			System.debug(i);
+		}
+		for (Integer i = 0; i < value; i++)
+		{
+		}
+		for (Account account : accounts)
+		{
+		}
+		while (value > 0)
+		{
+			value--;
+		}
+		while (value > 0)
+		{
+		}
+		do
+		{
+			value--;
+		}
+		while (value > 0);
+		try
+		{
+			System.debug(value);
+		}
+		// Keep clause comments attached while changing the clause separator.
+		catch (Exception e)
+		{
+			System.debug(e);
+		}
+		// The finally clause is also a separate Allman header.
+		finally
+		{
+			System.debug(value);
+		}
+		System.runAs(user)
+		{
+			System.debug(value);
+		}
+		switch on value
+		{
+			when 1
+			{
+				System.debug('one');
+			}
+			when else
+			{
+				System.debug('other');
+			}
+		}
+	}
+}
+
+interface ConfigurableContract
+{
+	void execute();
+}
+
+trigger ConfigurableTrigger on Account(after insert)
+{
+	System.debug(Trigger.new);
+}

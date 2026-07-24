@@ -236,6 +236,11 @@ impl<'a> DocBuilder<'a> {
         }
     }
 
+    /// Separator between adjacent clauses such as `try`/`catch`/`finally`.
+    pub fn clause_sep(&'a self) -> DocRef<'a> {
+        self.body_open_sep()
+    }
+
     /// Whether single-statement clause bodies are wrapped in synthesized braces.
     pub fn wraps_single(&self) -> bool {
         self.config.wrap_single_statements
@@ -253,6 +258,20 @@ impl<'a> DocBuilder<'a> {
             self.nl(),
             self.txt("}"),
         ])
+    }
+
+    /// Emit an empty brace block when single-statement bodies are enabled.
+    pub fn empty_clause_body(&'a self) -> DocRef<'a> {
+        if self.config.wrap_single_statements {
+            self.concat(vec![
+                self.body_open_sep(),
+                self.txt("{"),
+                self.nl(),
+                self.txt("}"),
+            ])
+        } else {
+            self.nil()
+        }
     }
 
     /// Emit a control-flow clause body (an `if`/`else`/loop body) with brace
