@@ -3,3 +3,4 @@ indent_size = 4
 brace_style = "allman"
 wrap_single_statements = true
 indent_style = "tab"
+normalize_annotation_casing = true
