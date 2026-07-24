@@ -124,6 +124,9 @@ Create a `file.cls` file with valid Apex code.
 # Format one file to stdout
 afmt AccountService.cls
 
+# Format an in-memory Apex buffer from stdin
+cat AccountService.cls | afmt -
+
 # Recursively format a directory in place
 afmt --write force-app
 
@@ -172,10 +175,17 @@ and exits nonzero for any changed file, processing failure, or empty selection.
 `--time` adds one stderr timing line per selected file and a total; it never
 changes formatted stdout.
 
-Single-file dry runs print only formatted Apex source. Multi-file dry runs
-print each source block with a deterministic `==> path <==` delimiter. Exit
-code `0` means formatting or checking succeeded; exit code `1` means an
-application error, changed file in check mode, or partial write failure.
+Use `afmt -` when an editor or another tool already holds Apex source in memory.
+It reads the complete buffer from stdin and writes only the formatted source to
+stdout. Supply `-c/--config` when the buffer should use a specific config file;
+stdin mode does not discover `.afmt.toml` implicitly and cannot be combined with
+`--write` or `--check`.
+
+Dry runs selecting one file print only formatted Apex source. Dry runs
+selecting multiple files print each source block with a deterministic
+`==> path <==` delimiter. Exit code `0` means formatting or checking
+succeeded; exit code `1` means an application error, changed file in check
+mode, or partial write failure.
 
 ## 🔧 Configuration:
 
@@ -183,9 +193,9 @@ application error, changed file in check mode, or partial write failure.
 
 Example: `afmt -c .afmt.toml`
 
-In an explicitly supplied `.afmt.toml` config file, formatter settings and
-optional file-selection settings are supported. A config file is not loaded
-implicitly.
+In an explicitly supplied `.afmt.toml` config file, formatter settings, optional
+style controls, and optional file-selection settings are supported. A config
+file is not loaded implicitly.
 
 ```toml
 # Maximum line width
@@ -194,18 +204,47 @@ max_width = 80
 # Indentation size in spaces
 indent_size = 4
 
+# Optional style controls (defaults preserve afmt's existing output)
+# brace_style = "k_and_r"            # or "allman"
+# wrap_single_statements = false      # add braces to bare clause bodies
+# indent_style = "space"              # or "tab"
+# javadoc_star_column = "offset"      # or "flush"
+# normalize_annotation_casing = false  # canonicalize known annotation names
+
 # Optional replacement selection arrays. Uncomment to customize them.
 # [files]
 # include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
 # exclude = ["**/.git/**", "**/.sfdx/**", "**/node_modules/**"]
 ```
 
+`javadoc_star_column = "flush"` aligns JavaDoc continuation stars with the
+comment's indentation column (`* content`); the default `"offset"` preserves
+afmt's existing style (` * content`). In either mode, afmt normalizes the
+separator after the star to one space.
+
+When `indent_style = "tab"`, `indent_size` controls the number of columns per
+indent level, and line wrapping accounts for that configured width when applying
+`max_width`.
+
+When `normalize_annotation_casing = true`, known Apex annotation names are
+written with Salesforce's canonical casing, such as `@IsTest`, `@TestSetup`,
+and `@AuraEnabled`. Unknown annotation names remain verbatim. This option only
+normalizes the annotation name; annotation argument keys and values are left
+unchanged.
+
+Allman formatting places property and accessor body braces on their own lines.
+Compact auto-properties without accessor bodies keep their `{ get; set; }`
+contents on one line.
+
 Each supplied include or exclude array replaces its corresponding default.
 Patterns use portable `/` separators and are matched relative to the config
-directory when possible.
+directory when possible. Exclusions apply to explicit files and directories;
+excluded directories are not traversed.
 
-For the complete project-wide behavior and contributor validation workflow,
-see [the project-wide formatting guide](docs/project-wide-formatting.md) and
+See the [formatter configuration guide](docs/configuration.md) for the
+complete option behavior and defaults. For the complete project-wide behavior
+and contributor validation workflow, see
+[the project-wide formatting guide](docs/project-wide-formatting.md) and
 [the validation and benchmark guide](docs/validation-and-benchmarks.md).
 
 <br>
