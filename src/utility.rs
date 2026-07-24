@@ -608,9 +608,11 @@ pub fn build_chaining_context(node: &Node) -> Option<ChainingContext> {
 
     let is_parent_a_chaining_node = is_a_chaining_node(&parent_node);
 
-    let has_a_chaining_child = node
-        .try_c_by_n("object")
-        .map(|n| is_a_chaining_node(&n))
+    let object_node = node.try_c_by_n("object");
+
+    let has_a_chaining_child = object_node
+        .as_ref()
+        .map(is_a_chaining_node)
         .unwrap_or(false);
 
     if !is_parent_a_chaining_node && !has_a_chaining_child {
@@ -618,11 +620,31 @@ pub fn build_chaining_context(node: &Node) -> Option<ChainingContext> {
     }
 
     let is_top_most_in_a_chain = has_a_chaining_child && !is_parent_a_chaining_node;
+    let can_break_before_dot = object_node.map(|n| !is_pure_name_path(&n)).unwrap_or(false);
 
     Some(ChainingContext {
         is_top_most_in_a_chain,
         is_parent_a_chaining_node,
+        can_break_before_dot,
     })
+}
+
+/// A dot may carry whitespace before it only when its left-hand side is a
+/// value expression. Apex rejects `Type . member` because whitespace makes the
+/// parser read the head identifier as a variable reference. Without name
+/// resolution, a pure dotted-identifier path is conservatively always glued.
+fn is_pure_name_path(node: &Node) -> bool {
+    match node.kind() {
+        "identifier" => true,
+        "field_access" => {
+            node.try_c_by_k("safe_navigation_operator").is_none()
+                && node
+                    .try_c_by_n("object")
+                    .map(|object| is_pure_name_path(&object))
+                    .unwrap_or(false)
+        }
+        _ => false,
+    }
 }
 
 fn is_a_chaining_node(node: &Node) -> bool {
@@ -653,7 +675,23 @@ pub fn is_bracket_composite_node(node: &Node) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::is_pure_name_path;
     use super::truncate_snippet;
+    use tree_sitter::{Node, Parser};
+
+    fn find_node<'a>(node: Node<'a>, kind: &str, source: &'a str, text: &str) -> Option<Node<'a>> {
+        if node.kind() == kind && node.utf8_text(source.as_bytes()).ok() == Some(text) {
+            return Some(node);
+        }
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(found) = find_node(child, kind, source, text) {
+                return Some(found);
+            }
+        }
+        None
+    }
 
     #[test]
     fn truncate_snippet_never_splits_unicode() {
@@ -662,5 +700,86 @@ mod tests {
 
         assert_eq!(truncated, format!("{}…", "a".repeat(79)));
         assert!(std::str::from_utf8(truncated.as_bytes()).is_ok());
+    }
+
+    fn assert_name_path(source: &str, kind: &str, text: &str, expected: bool) {
+        let mut parser = Parser::new();
+        parser
+            .set_language(&tree_sitter_sfapex::apex::LANGUAGE.into())
+            .unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        let node = find_node(tree.root_node(), kind, source, text)
+            .unwrap_or_else(|| panic!("missing {kind} node {text:?} in {source:?}"));
+        assert_eq!(is_pure_name_path(&node), expected, "node: {text}");
+    }
+
+    #[test]
+    fn name_path_predicate_distinguishes_paths_from_value_expressions() {
+        assert_name_path(
+            "class Test { void run() { Foo; } }",
+            "identifier",
+            "Foo",
+            true,
+        );
+        assert_name_path(
+            "class Test { void run() { Foo.Bar.baz(); } }",
+            "field_access",
+            "Foo.Bar",
+            true,
+        );
+        assert_name_path(
+            "class Test { void run() { Foo?.bar.baz(); } }",
+            "field_access",
+            "Foo?.bar",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { String.valueOf(value); } }",
+            "method_invocation",
+            "String.valueOf(value)",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { foo[0].bar(); } }",
+            "array_access",
+            "foo[0]",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { [SELECT Id FROM Account].size(); } }",
+            "query_expression",
+            "[SELECT Id FROM Account]",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { this.foo(); } }",
+            "this",
+            "this",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { super.foo(); } }",
+            "super",
+            "super",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { new Foo().bar(); } }",
+            "object_creation_expression",
+            "new Foo()",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { (value + other).trim(); } }",
+            "parenthesized_expression",
+            "(value + other)",
+            false,
+        );
+        assert_name_path(
+            "class Test { void run() { 'value'.trim(); } }",
+            "string_literal",
+            "'value'",
+            false,
+        );
     }
 }
