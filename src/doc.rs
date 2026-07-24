@@ -60,6 +60,7 @@ pub struct PrettyConfig {
     pub brace_style: BraceStyle,
     pub wrap_single_statements: bool,
     pub indent_style: IndentStyle,
+    pub normalize_annotation_casing: bool,
 }
 
 impl PrettyConfig {
@@ -68,6 +69,7 @@ impl PrettyConfig {
         brace_style: BraceStyle,
         wrap_single_statements: bool,
         indent_style: IndentStyle,
+        normalize_annotation_casing: bool,
     ) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
@@ -77,6 +79,7 @@ impl PrettyConfig {
                 brace_style,
                 wrap_single_statements,
                 indent_style,
+                normalize_annotation_casing,
             }
         }
     }

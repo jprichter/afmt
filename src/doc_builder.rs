@@ -246,6 +246,11 @@ impl<'a> DocBuilder<'a> {
         self.config.wrap_single_statements
     }
 
+    /// Whether known Apex annotation names should use canonical casing.
+    pub fn normalizes_annotation_casing(&self) -> bool {
+        self.config.normalize_annotation_casing
+    }
+
     /// Brace-wrap an already-built single (non-block) statement: separator +
     /// `{` + indented statement + `}` on its own line. Honors `brace_style` via
     /// `body_open_sep`.
