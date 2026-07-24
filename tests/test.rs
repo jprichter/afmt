@@ -3,11 +3,43 @@ mod tests {
     use sf_afmt::message_helper::red;
     use sf_afmt::{formatter::*, message_helper::yellow};
     use similar::{ChangeTag, TextDiff};
-    use std::fs::File;
+    use std::fs::{self, File};
     use std::io::Write;
     use std::path::Path;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn invalid_config_is_reported_before_discovery_without_panic_banner() {
+        let directory = std::env::temp_dir().join(format!(
+            "sf-afmt-invalid-config-cli-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let config_path = directory.join(".afmt.toml");
+        let missing_target = directory.join("missing-target");
+        fs::write(&config_path, "indent_size = 0\n").unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg("--config")
+            .arg(&config_path)
+            .arg(&missing_target)
+            .output()
+            .expect("failed to execute afmt");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(!output.status.success());
+        assert!(stderr.contains("Invalid formatter configuration: indent_size must be at least 1"));
+        assert!(!stderr.contains("panicked at"));
+        assert!(!stderr.contains("thread '"));
+        assert!(!stderr.contains("Formatting panicked"));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn statics() {

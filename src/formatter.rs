@@ -50,8 +50,16 @@ impl Config {
     pub fn new(max_width: u32) -> Self {
         Self {
             max_width,
-            indent_size: 2,
+            ..Config::default()
         }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.indent_size == 0 {
+            return Err("indent_size must be at least 1".to_string());
+        }
+
+        Ok(())
     }
 
     pub fn from_file(path: &str) -> Result<Self, String> {
@@ -59,6 +67,9 @@ impl Config {
             fs::read_to_string(path).map_err(|e| format!("Failed to read config file: {}", e))?;
         let config: Config =
             toml::from_str(&content).map_err(|e| format!("Failed to parse config file: {}", e))?;
+        config
+            .validate()
+            .map_err(|error| format!("Invalid formatter configuration: {error}"))?;
         Ok(config)
     }
 
@@ -176,6 +187,13 @@ impl Formatter {
     }
 
     pub fn try_format_one(path: &Path, config: Config) -> Result<FormattedFile, FormatFileError> {
+        if let Err(error) = config.validate() {
+            return Err(FormatFileError {
+                path: path.to_path_buf(),
+                message: format!("Invalid formatter configuration: {error}"),
+            });
+        }
+
         let source_code = fs::read_to_string(path).map_err(|error| FormatFileError {
             path: path.to_path_buf(),
             message: format!(
@@ -213,6 +231,10 @@ impl Formatter {
     }
 
     fn try_format_source(source_code: &str, config: Config) -> Result<String, String> {
+        config
+            .validate()
+            .map_err(|error| format!("Invalid formatter configuration: {error}"))?;
+
         let ast_tree = Self::try_parse(source_code)?;
         clear_thread_source_code();
         clear_thread_comment_map();
@@ -473,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn unexpected_formatting_panics_are_path_aware() {
+    fn invalid_configuration_is_path_aware_without_panic_rewrite() {
         let directory = temporary_directory();
         let path = directory.join("panic.cls");
         fs::write(
@@ -485,16 +507,67 @@ mod tests {
         let error = Formatter::try_format_one(
             &path,
             Config {
-                max_width: 80,
                 indent_size: 0,
+                ..Config::default()
             },
         )
-        .expect_err("invalid formatter configuration should panic in the formatter");
+        .expect_err("invalid formatter configuration should return an error");
 
         assert_eq!(error.path, path);
-        assert!(error.message.contains("Formatting panicked"));
-        assert!(error.message.contains("indent_size must be greater than 0"));
+        assert!(error
+            .message
+            .contains("Invalid formatter configuration: indent_size must be at least 1"));
+        assert!(!error.message.contains("Formatting panicked"));
         fs::remove_dir_all(directory).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn config_validation_accepts_lower_bound_and_zero_width() {
+        // Split into two literals so each leaves a field defaulted: `validate`
+        // must ignore `max_width` entirely, and accept `indent_size` at its
+        // lower bound. Avoids a positional literal that breaks when new config
+        // keys land.
+        assert_eq!(
+            Config {
+                max_width: 0,
+                ..Config::default()
+            }
+            .validate(),
+            Ok(())
+        );
+        assert_eq!(
+            Config {
+                indent_size: 1,
+                ..Config::default()
+            }
+            .validate(),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn config_validation_rejects_zero_indent() {
+        assert_eq!(
+            Config {
+                indent_size: 0,
+                ..Config::default()
+            }
+            .validate(),
+            Err("indent_size must be at least 1".to_string())
+        );
+    }
+
+    #[test]
+    fn config_file_rejects_zero_indent_as_configuration_error() {
+        let directory = temporary_directory();
+        let path = directory.join(".afmt.toml");
+        fs::write(&path, "indent_size = 0\n").unwrap();
+
+        let error = Config::from_file(path.to_str().unwrap()).unwrap_err();
+
+        assert!(error.contains("Invalid formatter configuration"));
+        assert!(error.contains("indent_size must be at least 1"));
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
