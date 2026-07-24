@@ -216,6 +216,8 @@ pub fn collect_comments(cursor: &mut TreeCursor, comment_map: &mut CommentMap) {
                     } else {
                         // Otherwise, the sibling is a named node, no special treatment needed
                         if child.end_position().row == last_row {
+                            let mut c = c;
+                            c.mark_as_inline_post_comment();
                             comment_map
                                 .entry(last_id)
                                 .or_insert_with(CommentBucket::new)
@@ -228,8 +230,27 @@ pub fn collect_comments(cursor: &mut TreeCursor, comment_map: &mut CommentMap) {
                     }
                 }
             } else {
-                // There's no "last associable node" yet, so keep it pending
-                pending_pre_comments.push(comment);
+                // A comment on the same line as an `else` belongs after the
+                // keyword, even when the parser nests the comment under the
+                // following statement.
+                if let Some(previous) = node.prev_sibling() {
+                    if previous.kind() == "else"
+                        && child.start_position().row == previous.end_position().row
+                    {
+                        let mut comment = comment;
+                        comment.mark_as_inline_post_comment();
+                        comment_map
+                            .entry(previous.id())
+                            .or_insert_with(CommentBucket::new)
+                            .post_comments
+                            .push(comment);
+                    } else {
+                        pending_pre_comments.push(comment);
+                    }
+                } else {
+                    // There's no "last associable node" yet, so keep it pending
+                    pending_pre_comments.push(comment);
+                }
             }
         } else if child.is_named() || is_associable_unnamed_node(&child) {
             // It's an associable node

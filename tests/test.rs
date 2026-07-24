@@ -15,6 +15,25 @@ mod tests {
     }
 
     #[test]
+    fn idempotency_static() {
+        let config = Config::from_file("tests/configs/.afmt_static.toml")
+            .expect("failed to load static test config");
+
+        for source_path in [
+            "tests/static/comment_method_chain.in",
+            "tests/static/comment_method_chain_mixed_block_line.in",
+            "tests/static/comment_method_chain_mixed_line_block.in",
+            "tests/static/comment_unbraced_else.in",
+        ] {
+            let input = std::fs::read_to_string(source_path).expect("failed to read fixture");
+            let first = format_source(&input, &config);
+            let second = format_source(&first, &config);
+
+            assert_eq!(first, second, "{} is not idempotent", source_path);
+        }
+    }
+
+    #[test]
     fn prettier80() {
         let (total, failed) = run_scenario("tests/prettier80", "prettier80");
         assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
@@ -202,6 +221,14 @@ mod tests {
             .next()
             .and_then(|result| result.ok())
             .expect("format result failed.")
+    }
+
+    fn format_source(source: &str, config: &Config) -> String {
+        let source = source.to_owned();
+        let config = config.clone();
+        std::thread::spawn(move || Formatter::format_one(&source, config))
+            .join()
+            .expect("format thread panicked")
     }
 
     fn print_side_by_side_diff(against: &str, output: &str, expected: &str) {
