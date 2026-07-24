@@ -147,6 +147,11 @@ impl<'a> DocBuild<'a> for Comment {
 
                 // JavaDoc formatting
                 if self.value.starts_with("/**") {
+                    let star = match b.config.javadoc_star_column {
+                        crate::doc::JavadocStarColumn::Offset => " *",
+                        crate::doc::JavadocStarColumn::Flush => "*",
+                    };
+
                     // Handle the first line that might contain both /** and content
                     if !lines.is_empty() {
                         let first_line = lines[0].trim();
@@ -173,18 +178,18 @@ impl<'a> DocBuild<'a> for Comment {
                             if let Some(before_end) = trimmed.strip_suffix("*/") {
                                 let content = before_end.trim();
                                 if content.is_empty() {
-                                    result.push(b.txt(" */"));
+                                    result.push(b.txt(format!("{star}/")));
                                 } else {
-                                    result.push(b.txt(format!(" * {}", content))); // First line: Preserve content
+                                    result.push(b.txt(format!("{star} {content}"))); // First line: Preserve content
                                     result.push(b.nl()); // Newline before closing */
-                                    result.push(b.txt(" */")); // Second line: Properly close the comment
+                                    result.push(b.txt(format!("{star}/"))); // Second line: Properly close the comment
                                 }
                             } else {
-                                result.push(b.txt(" */")); // Fallback (shouldn't happen in valid JavaDoc)
+                                result.push(b.txt(format!("{star}/"))); // Fallback (shouldn't happen in valid JavaDoc)
                             }
                         } else if trimmed.is_empty() {
                             // Handle empty lines
-                            result.push(b.txt(" *"));
+                            result.push(b.txt(star));
                         } else {
                             // Handle content lines
                             if let Some(after_star) = trimmed.strip_prefix('*') {
@@ -192,14 +197,14 @@ impl<'a> DocBuild<'a> for Comment {
                                 let content = after_star.trim_start(); // Remove all leading spaces
                                 if content.is_empty() {
                                     // Just a star with no content
-                                    result.push(b.txt(" *"));
+                                    result.push(b.txt(star));
                                 } else {
                                     // Star with content - add exactly one space
-                                    result.push(b.txt(format!(" * {}", content)));
+                                    result.push(b.txt(format!("{star} {content}")));
                                 }
                             } else {
                                 // Line doesn't have a star, add standard formatting
-                                result.push(b.txt(format!(" * {}", trimmed)));
+                                result.push(b.txt(format!("{star} {trimmed}")));
                             }
                         }
 

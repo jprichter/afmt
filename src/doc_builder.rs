@@ -7,7 +7,7 @@ use typed_arena::Arena;
 
 pub struct DocBuilder<'a> {
     arena: Arena<Doc<'a>>,
-    config: PrettyConfig,
+    pub(crate) config: PrettyConfig,
 }
 
 impl<'a> DocBuilder<'a> {
