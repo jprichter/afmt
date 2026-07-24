@@ -43,6 +43,29 @@ fn single_file_dry_run_keeps_stdout_as_plain_formatted_source() {
 }
 
 #[test]
+fn one_file_directory_dry_run_keeps_stdout_plain_and_reports_bulk_summary() {
+    let directory = temporary_directory();
+    let path = directory.join("Account.cls");
+    write_fixture(&path);
+    let original = fs::read(&path).expect("source should be readable");
+
+    let directory_arg = directory.to_str().unwrap();
+    let output = run_cli(&directory, &[directory_arg]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    assert!(stdout.starts_with("class A {"));
+    assert!(!stdout.contains("==>"));
+    assert!(stderr.contains("Summary: selected=1"));
+    assert_eq!(
+        fs::read(&path).expect("source should remain readable"),
+        original
+    );
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
 fn multi_file_dry_run_is_delimited_and_sorted() {
     let directory = temporary_directory();
     let first = directory.join("z.cls");

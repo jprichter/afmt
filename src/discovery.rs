@@ -83,6 +83,10 @@ pub fn discover_targets(
     let mut accumulator = DiscoveryAccumulator::new(base, includes, excludes);
 
     for target in targets {
+        if accumulator.is_excluded(target, false) {
+            continue;
+        }
+
         let metadata = fs::symlink_metadata(target).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
                 DiscoveryConfigError::InputMissing(target.clone())
@@ -97,7 +101,19 @@ pub fn discover_targets(
         if metadata.is_file() {
             accumulator.consider_file(target, false);
         } else if metadata.is_dir() {
-            for entry in WalkDir::new(target).follow_links(false).into_iter() {
+            if accumulator.is_excluded(target, true) {
+                continue;
+            }
+
+            let excludes = accumulator.excludes.clone();
+            let base = accumulator.base;
+            for entry in WalkDir::new(target)
+                .follow_links(false)
+                .into_iter()
+                .filter_entry(|entry| {
+                    !is_excluded_path(base, &excludes, entry.path(), entry.file_type().is_dir())
+                })
+            {
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(error) => {
@@ -181,9 +197,12 @@ impl<'a> DiscoveryAccumulator<'a> {
     }
 
     fn consider_file(&mut self, path: &Path, discovered: bool) {
+        if self.is_excluded(path, false) {
+            return;
+        }
+
         let candidate = normalized_match_path(path, self.base);
-        if self.excludes.is_match(&candidate) || (discovered && !self.includes.is_match(&candidate))
-        {
+        if discovered && !self.includes.is_match(&candidate) {
             return;
         }
 
@@ -201,6 +220,15 @@ impl<'a> DiscoveryAccumulator<'a> {
             self.files.push(path.to_path_buf());
         }
     }
+
+    fn is_excluded(&self, path: &Path, directory: bool) -> bool {
+        is_excluded_path(self.base, &self.excludes, path, directory)
+    }
+}
+
+fn is_excluded_path(base: &Path, excludes: &GlobSet, path: &Path, directory: bool) -> bool {
+    let candidate = normalized_match_path(path, base);
+    excludes.is_match(&candidate) || (directory && excludes.is_match(format!("{candidate}/")))
 }
 
 fn normalized_match_path(path: &Path, base: &Path) -> String {
@@ -346,6 +374,92 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.files, vec![project.0.join("explicit.custom")]);
+    }
+
+    #[test]
+    fn built_in_exclusion_predicate_matches_root_and_nested_directories() {
+        let (project, selection) = project_files();
+        let nested = project.0.join("nested");
+        for name in [".git", ".sfdx", "node_modules"] {
+            create_dir_all(nested.join(name)).unwrap();
+        }
+        let accumulator = DiscoveryAccumulator::new(
+            &project.0,
+            compile_globs("include", &selection.include).unwrap(),
+            compile_globs("exclude", &selection.exclude).unwrap(),
+        );
+
+        for path in [
+            project.0.join(".git"),
+            project.0.join(".sfdx"),
+            project.0.join("node_modules"),
+            nested.join(".git"),
+            nested.join(".sfdx"),
+            nested.join("node_modules"),
+        ] {
+            assert!(accumulator.is_excluded(&path, true), "{}", path.display());
+        }
+    }
+
+    #[test]
+    fn custom_excluded_directories_are_pruned_before_descent() {
+        let (project, _) = project_files();
+        let vendor = project.0.join("nested/vendor/deep");
+        create_dir_all(&vendor).unwrap();
+        let sentinel = vendor.join("sentinel.cls");
+        write(&sentinel, "class Sentinel {}\n").unwrap();
+        let selection = FileSelectionConfig {
+            include: FileSelectionConfig::default().include,
+            exclude: vec!["**/vendor/**".to_string()],
+        };
+        let accumulator = DiscoveryAccumulator::new(
+            &project.0,
+            compile_globs("include", &selection.include).unwrap(),
+            compile_globs("exclude", &selection.exclude).unwrap(),
+        );
+        let vendor_match = normalized_match_path(&project.0.join("nested/vendor"), &project.0);
+
+        assert!(!accumulator.excludes.is_match(&vendor_match));
+        assert!(accumulator.excludes.is_match(format!("{vendor_match}/")));
+        assert!(accumulator.is_excluded(&project.0.join("nested/vendor"), true));
+
+        let report =
+            discover_targets(std::slice::from_ref(&project.0), &selection, &project.0).unwrap();
+
+        assert!(!report.files.contains(&sentinel));
+        assert!(report.files.contains(&project.0.join("root.cls")));
+        assert!(report.errors.is_empty());
+    }
+
+    #[test]
+    fn explicitly_excluded_directories_are_skipped() {
+        let (project, selection) = project_files();
+        let excluded = project.0.join("node_modules");
+
+        assert_eq!(
+            discover_targets(std::slice::from_ref(&excluded), &selection, &project.0),
+            Err(DiscoveryConfigError::NoMatches)
+        );
+
+        let report = discover_targets(
+            &[excluded, project.0.join("root.cls")],
+            &selection,
+            &project.0,
+        )
+        .unwrap();
+        assert_eq!(report.files, vec![project.0.join("root.cls")]);
+        assert!(report.errors.is_empty());
+    }
+
+    #[test]
+    fn missing_descendants_of_excluded_directories_are_skipped() {
+        let (project, selection) = project_files();
+        let missing = project.0.join("node_modules/blocked/deep.cls");
+
+        assert_eq!(
+            discover_targets(std::slice::from_ref(&missing), &selection, &project.0),
+            Err(DiscoveryConfigError::NoMatches)
+        );
     }
 
     #[test]

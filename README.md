@@ -172,10 +172,11 @@ and exits nonzero for any changed file, processing failure, or empty selection.
 `--time` adds one stderr timing line per selected file and a total; it never
 changes formatted stdout.
 
-Single-file dry runs print only formatted Apex source. Multi-file dry runs
-print each source block with a deterministic `==> path <==` delimiter. Exit
-code `0` means formatting or checking succeeded; exit code `1` means an
-application error, changed file in check mode, or partial write failure.
+Dry runs selecting one file print only formatted Apex source. Dry runs
+selecting multiple files print each source block with a deterministic
+`==> path <==` delimiter. Exit code `0` means formatting or checking
+succeeded; exit code `1` means an application error, changed file in check
+mode, or partial write failure.
 
 ## 🔧 Configuration:
 
@@ -228,7 +229,8 @@ contents on one line.
 
 Each supplied include or exclude array replaces its corresponding default.
 Patterns use portable `/` separators and are matched relative to the config
-directory when possible.
+directory when possible. Exclusions apply to explicit files and directories;
+excluded directories are not traversed.
 
 See the [formatter configuration guide](docs/configuration.md) for the
 complete option behavior and defaults. For the complete project-wide behavior
