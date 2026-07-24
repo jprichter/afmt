@@ -600,6 +600,7 @@ impl<'a> DocBuild<'a> for AssignmentExpression {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum AssignmentLeft {
     Identifier(ValueNode),
     Field(FieldAccess),
@@ -1421,6 +1422,7 @@ impl<'a> DocBuild<'a> for ParenthesizedExpression {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ForInitOption {
     Declaration(LocalVariableDeclaration),
     Exps(Vec<Expression>),
@@ -2600,27 +2602,31 @@ impl ArrayCreationExpression {
         let value_node = node.try_c_by_n("value");
         let dimensions_node = node.try_c_by_n("dimensions");
 
-        let variant = if value_node.is_none() {
-            // DD
-            let dimensions_exprs = node
-                .cs_by_k("dimensions_expr")
-                .into_iter()
-                .map(|n| DimensionsExpr::new(n))
-                .collect();
-            let dimensions = node.try_c_by_k("dimensions").map(|n| Dimensions::new(n));
-            ArrayCreationVariant::DD {
-                dimensions_exprs,
-                dimensions,
+        let variant = match (value_node, dimensions_node) {
+            (None, _) => {
+                // DD
+                let dimensions_exprs = node
+                    .cs_by_k("dimensions_expr")
+                    .into_iter()
+                    .map(|n| DimensionsExpr::new(n))
+                    .collect();
+                let dimensions = node.try_c_by_k("dimensions").map(|n| Dimensions::new(n));
+                ArrayCreationVariant::DD {
+                    dimensions_exprs,
+                    dimensions,
+                }
             }
-        } else if dimensions_node.is_none() {
-            //OnlyV
-            let value = ArrayInitializer::new(node.c_by_n("value"));
-            ArrayCreationVariant::OnlyV { value }
-        } else {
-            //DV
-            ArrayCreationVariant::DV {
-                value: ArrayInitializer::new(value_node.unwrap()),
-                dimensions: Dimensions::new(dimensions_node.unwrap()),
+            (Some(value_node), None) => {
+                // OnlyV
+                let value = ArrayInitializer::new(value_node);
+                ArrayCreationVariant::OnlyV { value }
+            }
+            (Some(value_node), Some(dimensions_node)) => {
+                // DV
+                ArrayCreationVariant::DV {
+                    value: ArrayInitializer::new(value_node),
+                    dimensions: Dimensions::new(dimensions_node),
+                }
             }
         };
 
@@ -3880,6 +3886,7 @@ impl<'a> DocBuild<'a> for QueryExpression {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum QueryBody {
     Soql(SoqlQueryBody),
     Sosl(SoslQueryBody),
@@ -5076,6 +5083,7 @@ impl<'a> DocBuild<'a> for GroupByClause {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum GroupByExpression {
     Field(FieldIdentifier),
     Func(FunctionExpression),

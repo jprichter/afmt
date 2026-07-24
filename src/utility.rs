@@ -99,7 +99,7 @@ pub fn print_comment_map(tree: &Tree) {
     }
 }
 
-fn build_id_node_map(ast_tree: &Tree) -> HashMap<usize, Node> {
+fn build_id_node_map(ast_tree: &Tree) -> HashMap<usize, Node<'_>> {
     let mut cursor = ast_tree.walk();
     let mut node_map = HashMap::new();
 
