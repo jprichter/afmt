@@ -3,35 +3,48 @@ mod tests {
     use sf_afmt::message_helper::red;
     use sf_afmt::{formatter::*, message_helper::yellow};
     use similar::{ChangeTag, TextDiff};
-    use std::fs::File;
+    use std::fs::{self, File};
     use std::io::Write;
     use std::path::Path;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn statics() {
-        let (total, failed) = run_scenario("tests/static", "static");
-        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    fn invalid_config_is_reported_before_discovery_without_panic_banner() {
+        let directory = std::env::temp_dir().join(format!(
+            "sf-afmt-invalid-config-cli-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let config_path = directory.join(".afmt.toml");
+        let missing_target = directory.join("missing-target");
+        fs::write(&config_path, "indent_size = 0\nindent_style = \"tab\"\n").unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg("--config")
+            .arg(&config_path)
+            .arg(&missing_target)
+            .output()
+            .expect("failed to execute afmt");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(!output.status.success());
+        assert!(stderr.contains("Invalid formatter configuration: indent_size must be at least 1"));
+        assert!(!stderr.contains("panicked at"));
+        assert!(!stderr.contains("thread '"));
+        assert!(!stderr.contains("Formatting panicked"));
+
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
-    fn idempotency_static() {
-        let config = Config::from_file("tests/configs/.afmt_static.toml")
-            .expect("failed to load static test config");
-
-        for source_path in [
-            "tests/static/comment_method_chain.in",
-            "tests/static/comment_method_chain_mixed_block_line.in",
-            "tests/static/comment_method_chain_mixed_line_block.in",
-            "tests/static/comment_unbraced_else.in",
-        ] {
-            let input = std::fs::read_to_string(source_path).expect("failed to read fixture");
-            let first = format_source(&input, &config);
-            let second = format_source(&first, &config);
-
-            assert_eq!(first, second, "{} is not idempotent", source_path);
-        }
+    fn statics() {
+        let (total, failed) = run_scenario("tests/static", "static");
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
     }
 
     #[test]
@@ -43,6 +56,12 @@ mod tests {
     #[test]
     fn comments() {
         let (total, failed) = run_scenario("tests/comments", "comments");
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
+    fn configurable_style() {
+        let (total, failed) = run_scenario("tests/configurable_style", "configurable_style");
         assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
     }
 
@@ -66,6 +85,15 @@ mod tests {
             "tests/comments",
             "comments",
             "tests/configs/.afmt_static.toml",
+        );
+    }
+
+    #[test]
+    fn idempotency_configurable_style() {
+        run_idempotency(
+            "tests/configurable_style",
+            "configurable_style",
+            "tests/configs/.afmt_configurable_style.toml",
         );
     }
 
@@ -104,6 +132,34 @@ mod tests {
         } else {
             println!("{}", yellow("All tests passed!"));
         }
+    }
+
+    #[test]
+    fn no_expected_output_has_trailing_whitespace() {
+        let fixture_dirs = ["tests/static", "tests/prettier80", "tests/comments"];
+        let mut offenders = Vec::new();
+
+        for directory in fixture_dirs {
+            for entry in std::fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|extension| extension.to_str()) != Some("cls") {
+                    continue;
+                }
+
+                let output = std::fs::read_to_string(&path).unwrap();
+                for (line_number, line) in output.lines().enumerate() {
+                    if line.ends_with(' ') || line.ends_with('\t') {
+                        offenders.push(format!("{}:{}", path.display(), line_number + 1));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            offenders.is_empty(),
+            "trailing whitespace in expected output:\n{}",
+            offenders.join("\n")
+        );
     }
 
     fn run_scenario(dir_path: &str, scenario_name: &str) -> (u32, u32) {
@@ -189,6 +245,7 @@ mod tests {
             "static" => run_static_test_files(source),
             "prettier80" => run_prettier_test_files(source, "p80"),
             "comments" => run_static_test_files(source),
+            "configurable_style" => run_configurable_style_test_files(source),
             _ => panic!("Unknown scenario: {}", scenario_name),
         });
 
@@ -217,6 +274,19 @@ mod tests {
         });
 
         compare("Static:", output, expected, source)
+    }
+
+    fn run_configurable_style_test_files(source: &Path) -> bool {
+        let expected_file = source.with_extension("cls");
+        let output = format_with_afmt(source, Some("tests/configs/.afmt_configurable_style.toml"));
+        let expected = std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
+            panic!(
+                "Failed to read expected .cls file at {}",
+                red(&expected_file.to_string_lossy())
+            )
+        });
+
+        compare("Configurable style:", output, expected, source)
     }
 
     fn run_prettier_test_files(source: &Path, config_name: &str) -> bool {
@@ -300,14 +370,6 @@ mod tests {
             .next()
             .and_then(|result| result.ok())
             .expect("format result failed.")
-    }
-
-    fn format_source(source: &str, config: &Config) -> String {
-        let source = source.to_owned();
-        let config = config.clone();
-        std::thread::spawn(move || Formatter::format_one(&source, config))
-            .join()
-            .expect("format thread panicked")
     }
 
     fn print_side_by_side_diff(against: &str, output: &str, expected: &str) {
