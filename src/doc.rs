@@ -72,6 +72,7 @@ pub struct PrettyConfig {
     pub wrap_single_statements: bool,
     pub indent_style: IndentStyle,
     pub javadoc_star_column: JavadocStarColumn,
+    pub normalize_annotation_casing: bool,
 }
 
 impl PrettyConfig {
@@ -81,6 +82,7 @@ impl PrettyConfig {
         wrap_single_statements: bool,
         indent_style: IndentStyle,
         javadoc_star_column: JavadocStarColumn,
+        normalize_annotation_casing: bool,
     ) -> Self {
         if indent_size == 0 {
             panic!("indent_size must be greater than 0")
@@ -91,6 +93,7 @@ impl PrettyConfig {
                 wrap_single_statements,
                 indent_style,
                 javadoc_star_column,
+                normalize_annotation_casing,
             }
         }
     }

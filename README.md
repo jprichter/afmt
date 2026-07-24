@@ -199,6 +199,7 @@ indent_size = 4
 # wrap_single_statements = false      # add braces to bare clause bodies
 # indent_style = "space"              # or "tab"
 # javadoc_star_column = "offset"      # or "flush"
+# normalize_annotation_casing = false  # canonicalize known annotation names
 
 # Optional replacement selection arrays. Uncomment to customize them.
 # [files]
@@ -214,6 +215,12 @@ separator after the star to one space.
 When `indent_style = "tab"`, `indent_size` controls the number of columns per
 indent level. Line wrapping measures each emitted tab as one logical column;
 visual tab stops may therefore differ from `max_width` calculations.
+
+When `normalize_annotation_casing = true`, known Apex annotation names are
+written with Salesforce's canonical casing, such as `@IsTest`, `@TestSetup`,
+and `@AuraEnabled`. Unknown annotation names remain verbatim. This option only
+normalizes the annotation name; annotation argument keys and values are left
+unchanged.
 
 Allman formatting places property and accessor body braces on their own lines.
 Compact auto-properties without accessor bodies keep their `{ get; set; }`

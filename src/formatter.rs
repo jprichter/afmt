@@ -45,6 +45,11 @@ pub struct Config {
     /// JavaDoc continuation-star placement. Default `offset` preserves output.
     #[serde(default)]
     pub javadoc_star_column: JavadocStarColumn,
+
+    /// Normalize known Apex annotation names to Salesforce's canonical casing.
+    /// Default `false` preserves source casing.
+    #[serde(default)]
+    pub normalize_annotation_casing: bool,
 }
 
 fn default_max_width() -> u32 {
@@ -64,6 +69,7 @@ impl Default for Config {
             wrap_single_statements: false,
             indent_style: IndentStyle::default(),
             javadoc_star_column: JavadocStarColumn::default(),
+            normalize_annotation_casing: false,
         }
     }
 }
@@ -77,6 +83,7 @@ impl Config {
             wrap_single_statements: false,
             indent_style: IndentStyle::default(),
             javadoc_star_column: JavadocStarColumn::default(),
+            normalize_annotation_casing: false,
         }
     }
 
@@ -261,6 +268,7 @@ impl Formatter {
             config.wrap_single_statements,
             config.indent_style,
             config.javadoc_star_column,
+            config.normalize_annotation_casing,
         );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
@@ -600,12 +608,13 @@ mod tests {
         assert_eq!(config.indent_style, IndentStyle::Space);
         assert_eq!(config.javadoc_star_column, JavadocStarColumn::Offset);
         assert!(!config.wrap_single_statements);
+        assert!(!config.normalize_annotation_casing);
     }
 
     #[test]
     fn style_keys_parse_from_snake_case() {
         let config: Config = toml::from_str(
-            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\njavadoc_star_column = \"flush\"\n",
+            "brace_style = \"allman\"\nindent_style = \"tab\"\nwrap_single_statements = true\njavadoc_star_column = \"flush\"\nnormalize_annotation_casing = true\n",
         )
         .unwrap();
 
@@ -613,6 +622,7 @@ mod tests {
         assert_eq!(config.indent_style, IndentStyle::Tab);
         assert_eq!(config.javadoc_star_column, JavadocStarColumn::Flush);
         assert!(config.wrap_single_statements);
+        assert!(config.normalize_annotation_casing);
     }
 
     #[test]
@@ -630,6 +640,12 @@ mod tests {
     #[test]
     fn invalid_javadoc_star_column_is_an_error() {
         let result: Result<Config, _> = toml::from_str("javadoc_star_column = \"aligned\"\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn invalid_annotation_casing_value_is_an_error() {
+        let result: Result<Config, _> = toml::from_str("normalize_annotation_casing = \"true\"\n");
         assert!(result.is_err());
     }
 
@@ -662,6 +678,103 @@ mod tests {
         .join()
         .unwrap();
         assert_eq!(second, first);
+    }
+
+    #[test]
+    fn annotation_casing_normalizes_known_names_and_preserves_unknown_names() {
+        let source = "@iStEsT(SeeAllData=true)\n@MyCustomAnno\nclass T {\n  // Keep this adjacent comment.\n  @aUrAeNaBlEd\n  static void run() {}\n}\n";
+        let config = Config {
+            normalize_annotation_casing: true,
+            ..Config::default()
+        };
+
+        let output = Formatter::format_one(source, config);
+
+        assert!(output.contains("@IsTest(SeeAllData=true)"));
+        assert!(output.contains("@MyCustomAnno"));
+        assert!(output.contains("// Keep this adjacent comment."));
+        assert!(output.contains("@AuraEnabled"));
+    }
+
+    #[test]
+    fn annotation_casing_covers_every_known_name() {
+        let cases = [
+            ("iStEsT", "IsTest"),
+            ("tEsTsEtUp", "TestSetup"),
+            ("tEsTvIsIbLe", "TestVisible"),
+            ("aUrAeNaBlEd", "AuraEnabled"),
+            ("fUtUrE", "Future"),
+            ("iNvOcAbLeMeThOd", "InvocableMethod"),
+            ("iNvOcAbLeVaRiAbLe", "InvocableVariable"),
+            ("hTtPgEt", "HttpGet"),
+            ("hTtPpOsT", "HttpPost"),
+            ("hTtPpUt", "HttpPut"),
+            ("hTtPpAtCh", "HttpPatch"),
+            ("hTtPdElEtE", "HttpDelete"),
+            ("rEsTrEsOuRcE", "RestResource"),
+            ("rEaDoNlY", "ReadOnly"),
+            ("rEmOtEaCtIoN", "RemoteAction"),
+            ("dEpReCaTeD", "Deprecated"),
+            ("sUpPrEsSwArNiNgS", "SuppressWarnings"),
+            ("nAmEsPaCeAcCeSsIbLe", "NamespaceAccessible"),
+            ("jSoNaCcEsS", "JsonAccess"),
+        ];
+        let mut source = cases
+            .iter()
+            .map(|(input, _)| format!("@{}\n", input))
+            .collect::<String>();
+        source.push_str("@mYCustomAnno\nclass T {}\n");
+        let config = Config {
+            normalize_annotation_casing: true,
+            ..Config::default()
+        };
+
+        let output = Formatter::format_one(&source, config);
+
+        for (_, expected) in cases {
+            assert!(
+                output.lines().any(|line| line == format!("@{}", expected)),
+                "missing canonical annotation @{expected} in output:\n{output}"
+            );
+        }
+        assert!(output.lines().any(|line| line == "@mYCustomAnno"));
+    }
+
+    #[test]
+    fn annotation_name_comments_survive_casing() {
+        let source = "@/* Keep this name comment. */iStEsT\nclass T {}\n";
+        let config = Config {
+            normalize_annotation_casing: true,
+            ..Config::default()
+        };
+
+        let output = Formatter::format_one(source, config);
+
+        assert!(
+            output.contains("@/* Keep this name comment. */ IsTest"),
+            "unexpected output:\n{output}"
+        );
+    }
+
+    #[test]
+    fn annotation_casing_is_idempotent() {
+        let source = "@ISTEST\nclass T {}\n";
+        let config = Config {
+            normalize_annotation_casing: true,
+            ..Config::default()
+        };
+
+        let once_config = config.clone();
+        let once = std::thread::spawn(move || Formatter::format_one(source, once_config))
+            .join()
+            .unwrap();
+        let once_for_second_pass = once.clone();
+        let twice =
+            std::thread::spawn(move || Formatter::format_one(&once_for_second_pass, config))
+                .join()
+                .unwrap();
+
+        assert_eq!(once, twice);
     }
 
     #[test]

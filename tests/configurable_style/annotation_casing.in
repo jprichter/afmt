@@ -1,0 +1,15 @@
+@rEsTrEsOuRcE(urlMapping='/v1/*')
+@iStEsT
+global class AnnotationCasing {
+  @aUrAeNaBlEd
+  public static void run() {}
+
+  @tEsTsEtUp
+  static void setup() {}
+
+  @fUtUrE
+  static void later() {}
+
+  @MyCustomAnno
+  public static void custom() {}
+}
