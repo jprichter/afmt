@@ -150,7 +150,7 @@ Afmt completed successfully.
 
 Example: `afmt -c .afmt.toml`
 
-In `.afmt.toml` config file, two options are supported
+In `.afmt.toml` config file, the following options are supported
 
 ```toml
 # Maximum line width
@@ -158,8 +158,20 @@ max_width = 80
 
 # Indentation size in spaces
 indent_size = 4
+
+# Optional style controls (defaults preserve afmt's existing output)
+# brace_style = "k_and_r"            # or "allman"
+# wrap_single_statements = false      # add braces to bare clause bodies
+# indent_style = "space"              # or "tab"
 ```
 
+When `indent_style = "tab"`, `indent_size` controls the number of columns per
+indent level. Line wrapping measures each emitted tab as one logical column;
+visual tab stops may therefore differ from `max_width` calculations.
+
+Allman formatting places property and accessor body braces on their own lines.
+Compact auto-properties without accessor bodies keep their `{ get; set; }`
+contents on one line.
 <br>
 
 ## ❓ FAQ
