@@ -118,13 +118,35 @@ Visit the [release page](https://github.com/xixiaofinland/afmt/releases/latest) 
 
 Create a `file.cls` file with valid Apex code.
 
+### Common commands
+
+```bash
+# Format one file to stdout
+afmt AccountService.cls
+
+# Recursively format a directory in place
+afmt --write force-app
+
+# Check multiple files and directories without writing
+afmt --check force-app packages/shared.cls
+
+# Use an explicitly supplied config and print per-file timing
+afmt --config .afmt.toml --time --write .
+```
+
+Directory inputs recursively select `.cls`, `.trigger`, `.apex`, and `.apexc`
+files in deterministic path order. Overlapping paths are processed once.
+Explicit files bypass the include patterns but still honor exclusions, and an
+exclude match always wins. The default exclusions are `.git`, `.sfdx`, and
+`node_modules`; a supplied `[files].exclude` array replaces those defaults, so
+repeat any defaults you still want.
+
 ### Dry Run:
 
 Run `afmt ./file.cls` to preview the formatting result.
 
 ```bash
 > afmt ./file.cls
-Result 0: Ok
 global class PluginDescribeResult {
     {
         [SELECT FIELDS(STANDARD) FROM Organization LIMIT 1];
@@ -135,14 +157,25 @@ global class PluginDescribeResult {
 ### Format and Write:
 
 Run `afmt -w ./file.cls` to format the file and overwrite it with the
-   formatted code.
+formatted code. Unchanged files are not rewritten.
 
 ```bash
 > afmt -w ./file.cls
-Formatted content written back to: ./file.cls
-Afmt completed successfully.
 ```
 <br>
+
+For multiple files, `--write` is best effort: a read, parse, format, or write
+failure is reported with its path, while other valid files continue. A final
+stderr summary reports selected, changed, written, unchanged, failed, and
+elapsed counts. `--check` never writes, lists every file that would change,
+and exits nonzero for any changed file, processing failure, or empty selection.
+`--time` adds one stderr timing line per selected file and a total; it never
+changes formatted stdout.
+
+Single-file dry runs print only formatted Apex source. Multi-file dry runs
+print each source block with a deterministic `==> path <==` delimiter. Exit
+code `0` means formatting or checking succeeded; exit code `1` means an
+application error, changed file in check mode, or partial write failure.
 
 ## 🔧 Configuration:
 
@@ -150,7 +183,9 @@ Afmt completed successfully.
 
 Example: `afmt -c .afmt.toml`
 
-In `.afmt.toml` config file, two options are supported
+In an explicitly supplied `.afmt.toml` config file, formatter settings and
+optional file-selection settings are supported. A config file is not loaded
+implicitly.
 
 ```toml
 # Maximum line width
@@ -158,7 +193,20 @@ max_width = 80
 
 # Indentation size in spaces
 indent_size = 4
+
+# Optional replacement selection arrays. Uncomment to customize them.
+# [files]
+# include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
+# exclude = ["**/.git/**", "**/.sfdx/**", "**/node_modules/**"]
 ```
+
+Each supplied include or exclude array replaces its corresponding default.
+Patterns use portable `/` separators and are matched relative to the config
+directory when possible.
+
+For the complete project-wide behavior and contributor validation workflow,
+see [the project-wide formatting guide](docs/project-wide-formatting.md) and
+[the validation and benchmark guide](docs/validation-and-benchmarks.md).
 
 <br>
 
@@ -182,6 +230,13 @@ PRs.
 
 Scenarios (e.g., new features, bug fixes) must be covered by tests, and `cargo test` passes.
 Refer to `*.in` (before format) and `*.cls` (after format) files in the [test folder](./tests/static).
+
+The active static, prettier80, and comments fixtures each have a separate
+two-pass idempotency test. For local bulk-performance measurements, run
+`tests/battle_test/benchmark_bulk.sh /path/to/a/local/corpus`; it builds once,
+keeps the corpus unchanged, and compares sequential process startup with one
+bulk invocation. The battle test uses the bulk command first and retains a
+per-file diagnostic fallback for tolerated managed-package templates.
 
 Also, our CI [pipeline](.github/workflows/pr-ci-merge-main.yml) ensures high-quality contributions.
 

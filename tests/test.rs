@@ -7,30 +7,12 @@ mod tests {
     use std::io::Write;
     use std::path::Path;
     use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn statics() {
         let (total, failed) = run_scenario("tests/static", "static");
         assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
-    }
-
-    #[test]
-    fn idempotency_static() {
-        let config = Config::from_file("tests/configs/.afmt_static.toml")
-            .expect("failed to load static test config");
-
-        for source_path in [
-            "tests/static/comment_method_chain.in",
-            "tests/static/comment_method_chain_mixed_block_line.in",
-            "tests/static/comment_method_chain_mixed_line_block.in",
-            "tests/static/comment_unbraced_else.in",
-        ] {
-            let input = std::fs::read_to_string(source_path).expect("failed to read fixture");
-            let first = format_source(&input, &config);
-            let second = format_source(&first, &config);
-
-            assert_eq!(first, second, "{} is not idempotent", source_path);
-        }
     }
 
     #[test]
@@ -43,6 +25,29 @@ mod tests {
     fn comments() {
         let (total, failed) = run_scenario("tests/comments", "comments");
         assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
+    fn idempotency_static() {
+        run_idempotency("tests/static", "static", "tests/configs/.afmt_static.toml");
+    }
+
+    #[test]
+    fn idempotency_prettier80() {
+        run_idempotency(
+            "tests/prettier80",
+            "prettier80",
+            "tests/configs/.afmt_p80.toml",
+        );
+    }
+
+    #[test]
+    fn idempotency_comments() {
+        run_idempotency(
+            "tests/comments",
+            "comments",
+            "tests/configs/.afmt_static.toml",
+        );
     }
 
     #[test]
@@ -104,6 +109,59 @@ mod tests {
             total_tests
         );
         (total_tests, failed_tests)
+    }
+
+    fn run_idempotency(dir_path: &str, scenario_name: &str, config_path: &str) {
+        let mut sources = std::fs::read_dir(dir_path)
+            .expect("idempotency fixture directory should be readable")
+            .map(|entry| entry.expect("fixture entry should be readable").path())
+            .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("in"))
+            .collect::<Vec<_>>();
+        sources.sort();
+
+        for source in sources {
+            let run_id = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock should be after the Unix epoch")
+                .as_nanos();
+            let first_path = std::env::temp_dir().join(format!(
+                "sf-afmt-idempotency-{}-{}-{}-first.cls",
+                std::process::id(),
+                scenario_name,
+                run_id
+            ));
+            let second_path = first_path.with_file_name(format!(
+                "sf-afmt-idempotency-{}-{}-{}-second.cls",
+                std::process::id(),
+                scenario_name,
+                run_id
+            ));
+
+            let first = format_with_afmt(&source, Some(config_path));
+            std::fs::write(&first_path, &first).expect("first formatted output should be written");
+            let second = format_with_afmt(&first_path, Some(config_path));
+            std::fs::write(&second_path, &second)
+                .expect("second formatted output should be written");
+
+            let first_bytes = std::fs::read(&first_path).expect("first output should be readable");
+            let second_bytes =
+                std::fs::read(&second_path).expect("second output should be readable");
+            if first_bytes != second_bytes {
+                let diff = TextDiff::from_lines(&first, &second)
+                    .unified_diff()
+                    .header("first pass", "second pass")
+                    .to_string();
+                panic!(
+                    "{} fixture is not idempotent: {}\n{}",
+                    scenario_name,
+                    source.display(),
+                    diff
+                );
+            }
+
+            std::fs::remove_file(first_path).expect("first temporary output should be removed");
+            std::fs::remove_file(second_path).expect("second temporary output should be removed");
+        }
     }
 
     fn run_test_file(source: &Path, scenario_name: &str) -> bool {
@@ -171,6 +229,8 @@ mod tests {
     fn normalize(content: &str) -> String {
         //println!("{} (Hex):", label);
         let mut normalized = String::new();
+        // Git may check out fixtures as CRLF on Windows, while the formatter emits LF.
+        let content = content.replace("\r\n", "\n");
 
         for (i, byte) in content.bytes().enumerate() {
             if i % 16 == 0 && i != 0 {

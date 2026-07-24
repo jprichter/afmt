@@ -1,10 +1,10 @@
 # Afmt
 To-Do:
 
-- resolve idempotent issue (it's in battle_test.sh and also added use-cases into the three tests)
-- add test folders into idempotent list
+- active static, prettier80, and comments fixture idempotency coverage is complete
+- battle-test bulk write/check idempotency path is covered; retain fallback diagnostics
 - to-do folder
-- create benchmark to run locally
+- local bulk benchmark is available at tests/battle_test/benchmark_bulk.sh
 - binary exp comments
 - remove all the "pub" properties in struct/enum
 

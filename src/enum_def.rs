@@ -14,6 +14,8 @@ pub enum RootMember {
     Enum(Box<EnumDeclaration>),
     Interface(Box<InterfaceDeclaration>),
     Trigger(Box<TriggerDeclaration>),
+    // Anonymous Apex (`.apex`) files allow bare statements at the top level.
+    Stmt(Box<Statement>),
 }
 
 impl RootMember {
@@ -23,7 +25,8 @@ impl RootMember {
             "enum_declaration" => Self::Enum(Box::new(EnumDeclaration::new(n))),
             "trigger_declaration" => Self::Trigger(Box::new(TriggerDeclaration::new(n))),
             "interface_declaration" => Self::Interface(Box::new(InterfaceDeclaration::new(n))),
-            _ => panic_unknown_node(n, "Root"),
+            // Fall back to statement handling for anonymous Apex top-level code.
+            _ => Self::Stmt(Box::new(Statement::new(n))),
         }
     }
 }
@@ -41,6 +44,9 @@ impl<'a> DocBuild<'a> for RootMember {
                 result.push(n.build(b));
             }
             RootMember::Trigger(n) => {
+                result.push(n.build(b));
+            }
+            RootMember::Stmt(n) => {
                 result.push(n.build(b));
             }
         }
@@ -314,6 +320,8 @@ impl<'a> DocBuild<'a> for Expression {
 //  ),
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum PrimaryExpression {
     Literal(Literal_),
     Identifier(ValueNode),
@@ -1461,7 +1469,7 @@ impl DateLiteralWithParam {
 impl<'a> DocBuild<'a> for DateLiteralWithParam {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
         build_with_comments_and_punc(b, &self.node_context, result, |b, result| {
-            result.push(b.txt(format!("{}:{}", &self.date_literal, &self.param)));
+            result.push(b.txt(format!("{}:{}", self.date_literal, self.param)));
         });
     }
 }
@@ -1563,6 +1571,8 @@ impl<'a> DocBuild<'a> for OffsetClause {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum FunctionExpressionVariant {
     WithGEO {
         function_name: ValueNode,
