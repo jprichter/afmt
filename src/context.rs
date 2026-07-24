@@ -337,22 +337,25 @@ impl Punctuation {
         }
         None
     }
-}
 
-impl<'a> DocBuild<'a> for Punctuation {
-    fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
-        // TODO: merge into normal bucket handling utiltiy method?
+    pub fn build_comments<'a>(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        self.build_inner_with_token(b, result, false);
+    }
 
+    fn build_inner_with_token<'a>(
+        &self,
+        b: &'a DocBuilder<'a>,
+        result: &mut Vec<DocRef<'a>>,
+        include_token: bool,
+    ) {
         let bucket = get_comment_bucket(&self.id);
 
-        // Separate line comments and block comments from pre_comments
         let (line_comments_in_pre, block_comments_in_pre): (Vec<Comment>, Vec<Comment>) = bucket
             .pre_comments
             .iter()
             .cloned()
             .partition(|comment| matches!(comment.comment_type, CommentType::Line));
 
-        // Merge line_comments with post_comments
         let updated_post_comments: Vec<_> = line_comments_in_pre
             .into_iter()
             .chain(bucket.post_comments.iter().cloned())
@@ -374,9 +377,11 @@ impl<'a> DocBuild<'a> for Punctuation {
             }
         }
 
-        match self.type_ {
-            PuncuationType::Comma => result.push(b.txt(",")),
-            PuncuationType::Semicolon => result.push(b.txt(";")),
+        if include_token {
+            match self.type_ {
+                PuncuationType::Comma => result.push(b.txt(",")),
+                PuncuationType::Semicolon => result.push(b.txt(";")),
+            }
         }
 
         for comment in updated_post_comments {
@@ -395,14 +400,18 @@ impl<'a> DocBuild<'a> for Punctuation {
             }
         }
 
-        // we assume all associated comment nodes are handled
-        // TODO: this is not ideal due to the comment map is currently defined read-only
         for comment in &bucket.pre_comments {
             comment.mark_as_printed();
         }
         for comment in &bucket.post_comments {
             comment.mark_as_printed();
         }
+    }
+}
+
+impl<'a> DocBuild<'a> for Punctuation {
+    fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        self.build_inner_with_token(b, result, true);
     }
 }
 
