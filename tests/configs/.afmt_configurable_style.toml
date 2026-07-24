@@ -4,3 +4,4 @@ brace_style = "allman"
 wrap_single_statements = true
 indent_style = "tab"
 javadoc_star_column = "flush"
+normalize_annotation_casing = true
