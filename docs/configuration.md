@@ -13,6 +13,7 @@ brace_style = "k_and_r"            # or "allman"
 wrap_single_statements = false      # or true
 indent_style = "space"              # or "tab"
 javadoc_star_column = "offset"      # or "flush"
+normalize_annotation_casing = false
 ```
 
 `brace_style = "allman"` puts opening braces on their own lines. The default
@@ -34,3 +35,10 @@ Javadoc (`/** ... */`) comments:
 In both modes, afmt normalizes the separator after the star to one space.
 Blank Javadoc lines and the closing line follow the same star-column choice.
 Non-Javadoc block comments and line comments are unaffected by this option.
+
+`normalize_annotation_casing` defaults to `false`, preserving authored
+annotation casing. When enabled, known Salesforce Apex annotation names use
+canonical casing: `@isTest` becomes `@IsTest`, `@testsetup` becomes
+`@TestSetup`, and `@auraenabled` becomes `@AuraEnabled`. Unknown or custom
+annotation names remain verbatim. Only the annotation name is normalized;
+argument keys, values, strings, and surrounding comments are unchanged.
