@@ -1,6 +1,6 @@
 use crate::context::CommentMap;
 use crate::data_model::*;
-use crate::doc::{pretty_print, PrettyConfig};
+use crate::doc::{pretty_print, BraceStyle, IndentStyle, PrettyConfig};
 use crate::doc_builder::DocBuilder;
 use crate::message_helper::{red, yellow};
 use crate::utility::{
@@ -23,6 +23,18 @@ pub struct Config {
 
     #[serde(default = "default_indent_size")]
     pub indent_size: u32,
+
+    /// Opening-brace placement. Default `k_and_r` preserves current output.
+    #[serde(default)]
+    pub brace_style: BraceStyle,
+
+    /// Wrap single-statement `if`/`else`/loop bodies in braces. Default `false`.
+    #[serde(default)]
+    pub wrap_single_statements: bool,
+
+    /// Indentation character. Default `space`.
+    #[serde(default)]
+    pub indent_style: IndentStyle,
 }
 
 fn default_max_width() -> u32 {
@@ -38,6 +50,9 @@ impl Default for Config {
         Self {
             max_width: default_max_width(),
             indent_size: default_indent_size(),
+            brace_style: BraceStyle::default(),
+            wrap_single_statements: false,
+            indent_style: IndentStyle::default(),
         }
     }
 }
@@ -47,6 +62,9 @@ impl Config {
         Self {
             max_width,
             indent_size: 2,
+            brace_style: BraceStyle::default(),
+            wrap_single_statements: false,
+            indent_style: IndentStyle::default(),
         }
     }
 
@@ -151,11 +169,16 @@ impl Formatter {
         let root: Root = enrich(&ast_tree);
 
         // traverse enriched data and create pretty print combinators
-        let c = PrettyConfig::new(config.indent_size);
+        let c = PrettyConfig::new(
+            config.indent_size,
+            config.brace_style,
+            config.wrap_single_statements,
+            config.indent_style,
+        );
         let b = DocBuilder::new(c);
         let doc_ref = root.build(&b);
 
-        let result = pretty_print(doc_ref, config.max_width);
+        let result = pretty_print(doc_ref, config.max_width, c);
 
         // debugging tool: use this to print named node value + comments in bucket
         // print_comment_map(&ast_tree);
