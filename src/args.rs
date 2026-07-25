@@ -1,5 +1,5 @@
-use clap::{Arg as ClapArg, Command};
-use std::path::PathBuf;
+use clap::{error::ErrorKind, Arg as ClapArg, Command};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Args {
@@ -10,22 +10,57 @@ pub struct Args {
     pub check: bool,
 }
 
+impl Args {
+    pub fn is_stdin(&self) -> bool {
+        self.paths.len() == 1 && self.paths[0] == Path::new("-")
+    }
+}
+
 pub fn get_args() -> Args {
     let version = env!("CARGO_PKG_VERSION"); // read from Cargo.toml in compiling time
 
     let matches = command(version).get_matches();
 
-    Args {
-        paths: matches
-            .get_many::<PathBuf>("path")
-            .expect("At least one path is required")
-            .cloned()
-            .collect(),
-        config: matches.get_one::<PathBuf>("config").cloned(),
-        write: matches.get_flag("write"),
-        time: matches.get_flag("time"),
-        check: matches.get_flag("check"),
+    let paths = matches
+        .get_many::<PathBuf>("path")
+        .expect("At least one path is required")
+        .cloned()
+        .collect::<Vec<_>>();
+    let write = matches.get_flag("write");
+    let check = matches.get_flag("check");
+
+    if let Err(message) = validate_paths(&paths, write, check) {
+        command(version)
+            .error(ErrorKind::ArgumentConflict, message)
+            .exit();
     }
+
+    Args {
+        paths,
+        config: matches.get_one::<PathBuf>("config").cloned(),
+        write,
+        time: matches.get_flag("time"),
+        check,
+    }
+}
+
+fn validate_paths(paths: &[PathBuf], write: bool, check: bool) -> Result<(), String> {
+    let contains_stdin = paths.iter().any(|path| path == Path::new("-"));
+    if !contains_stdin {
+        return Ok(());
+    }
+
+    if paths.len() != 1 {
+        return Err("stdin path '-' cannot be combined with other paths".to_string());
+    }
+    if write {
+        return Err("stdin path '-' cannot be combined with --write".to_string());
+    }
+    if check {
+        return Err("stdin path '-' cannot be combined with --check".to_string());
+    }
+
+    Ok(())
 }
 
 fn command(version: &'static str) -> Command {
@@ -122,5 +157,38 @@ mod tests {
                 PathBuf::from("two.apex")
             ]
         );
+    }
+
+    #[test]
+    fn accepts_a_lone_stdin_path() {
+        let matches = command("test").try_get_matches_from(["afmt", "-"]).unwrap();
+        let args = Args {
+            paths: matches
+                .get_many::<PathBuf>("path")
+                .unwrap()
+                .cloned()
+                .collect(),
+            config: None,
+            write: false,
+            time: false,
+            check: false,
+        };
+
+        assert!(args.is_stdin());
+    }
+
+    #[test]
+    fn rejects_stdin_with_other_paths_or_file_operations() {
+        let stdin = vec![PathBuf::from("-")];
+
+        assert!(validate_paths(
+            &[PathBuf::from("-"), PathBuf::from("file.cls")],
+            false,
+            false
+        )
+        .is_err());
+        assert!(validate_paths(&stdin, true, false).is_err());
+        assert!(validate_paths(&stdin, false, true).is_err());
+        assert!(validate_paths(&[PathBuf::from("file.cls")], true, false).is_ok());
     }
 }

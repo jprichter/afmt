@@ -124,6 +124,9 @@ Create a `file.cls` file with valid Apex code.
 # Format one file to stdout
 afmt AccountService.cls
 
+# Format an in-memory Apex buffer from stdin
+cat AccountService.cls | afmt -
+
 # Recursively format a directory in place
 afmt --write force-app
 
@@ -171,6 +174,12 @@ elapsed counts. `--check` never writes, lists every file that would change,
 and exits nonzero for any changed file, processing failure, or empty selection.
 `--time` adds one stderr timing line per selected file and a total; it never
 changes formatted stdout.
+
+Use `afmt -` when an editor or another tool already holds Apex source in memory.
+It reads the complete buffer from stdin and writes only the formatted source to
+stdout. Supply `-c/--config` when the buffer should use a specific config file;
+stdin mode does not discover `.afmt.toml` implicitly and cannot be combined with
+`--write` or `--check`.
 
 Dry runs selecting one file print only formatted Apex source. Dry runs
 selecting multiple files print each source block with a deterministic

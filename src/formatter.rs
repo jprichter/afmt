@@ -230,23 +230,11 @@ impl Formatter {
             ),
         })?;
 
-        let formatted = match catch_unwind(AssertUnwindSafe(|| {
-            Self::try_format_source(&source_code, config)
-        })) {
-            Ok(Ok(formatted)) => formatted,
-            Ok(Err(message)) => {
-                return Err(FormatFileError {
-                    path: path.to_path_buf(),
-                    message,
-                });
-            }
-            Err(panic_payload) => {
-                return Err(FormatFileError {
-                    path: path.to_path_buf(),
-                    message: format!("Formatting panicked: {}", panic_message(panic_payload)),
-                });
-            }
-        };
+        let formatted =
+            Self::try_format_source(&source_code, config).map_err(|message| FormatFileError {
+                path: path.to_path_buf(),
+                message,
+            })?;
 
         Ok(FormattedFile {
             changed: source_code != formatted,
@@ -258,7 +246,19 @@ impl Formatter {
         Self::try_format_source(source_code, config).unwrap_or_else(|message| panic!("{}", message))
     }
 
-    fn try_format_source(source_code: &str, config: Config) -> Result<String, String> {
+    pub fn try_format_source(source_code: &str, config: Config) -> Result<String, String> {
+        match catch_unwind(AssertUnwindSafe(|| {
+            Self::try_format_source_unchecked(source_code, config)
+        })) {
+            Ok(result) => result,
+            Err(panic_payload) => Err(format!(
+                "Formatting panicked: {}",
+                panic_message(panic_payload)
+            )),
+        }
+    }
+
+    fn try_format_source_unchecked(source_code: &str, config: Config) -> Result<String, String> {
         config
             .validate()
             .map_err(|error| format!("Invalid formatter configuration: {error}"))?;
@@ -567,6 +567,26 @@ mod tests {
         };
 
         assert_eq!(config.validate(), Ok(()));
+    }
+
+    #[test]
+    fn source_formatting_is_public_idempotent_and_validates_config() {
+        let source = include_str!("../tests/static/variable_declaration.in");
+        let formatted =
+            Formatter::try_format_source(source, Config::default()).expect("source should format");
+        let second = Formatter::try_format_source(&formatted, Config::default())
+            .expect("formatted source should remain valid");
+
+        assert_eq!(formatted, second);
+        assert!(Formatter::try_format_source(
+            source,
+            Config {
+                indent_size: 0,
+                ..Config::default()
+            }
+        )
+        .unwrap_err()
+        .contains("Invalid formatter configuration: indent_size must be at least 1"));
     }
 
     #[test]
