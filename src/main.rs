@@ -1,8 +1,9 @@
 use sf_afmt::args::{get_args, Args};
 use sf_afmt::config::AfmtConfig;
 use sf_afmt::discovery::{discover_targets, DiscoveryConfigError};
-use sf_afmt::formatter::Formatter;
-use std::io::{self, Write};
+use sf_afmt::formatter::{Config, Formatter};
+use std::io::{self, Read, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Instant;
 use std::{fs, process};
 
@@ -60,10 +61,38 @@ fn run(args: &Args, started: Instant) -> Result<RunSummary, String> {
     run_with_writer(args, started, |path, content| fs::write(path, content))
 }
 
+fn format_stdin_source(source: &str, config: Config) -> Result<String, String> {
+    // Stdin formatting is a synchronous CLI boundary. Keep the library's public
+    // formatter free of process-global hook changes while ensuring a caught
+    // formatter panic cannot leak Rust's default banner into stderr.
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        Formatter::try_format_source(source, config)
+    }));
+    std::panic::set_hook(previous_hook);
+
+    match result {
+        Ok(result) => result,
+        Err(_) => Err("Formatting panicked: unexpected formatter panic".to_string()),
+    }
+}
+
 fn run_with_writer<F>(args: &Args, started: Instant, write_file: F) -> Result<RunSummary, String>
 where
     F: Fn(&std::path::Path, &str) -> std::io::Result<()>,
 {
+    if args.is_stdin() {
+        let app_config = AfmtConfig::load(args.config.as_deref())?;
+        let mut source = String::new();
+        io::stdin()
+            .read_to_string(&mut source)
+            .map_err(|error| format!("Failed to read stdin: {error}"))?;
+        let formatted = format_stdin_source(&source, app_config.formatter)?;
+        print_source(&formatted);
+        return Ok(RunSummary::default());
+    }
+
     let app_config = AfmtConfig::load(args.config.as_deref())?;
     let base = AfmtConfig::base_dir(args.config.as_deref())?;
     let report = discover_targets(&args.paths, &app_config.files, &base)
