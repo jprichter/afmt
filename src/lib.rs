@@ -16,6 +16,10 @@ pub fn format(f: Formatter) -> Vec<Result<String, String>> {
     f.format()
 }
 
+pub fn format_source(source_code: &str, config: formatter::Config) -> Result<String, String> {
+    Formatter::try_format_source(source_code, config)
+}
+
 //#[wasm_bindgen]
 //pub fn greet(source_code: &str) -> String {
 //    let config = Config::default();

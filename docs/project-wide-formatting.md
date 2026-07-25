@@ -52,6 +52,14 @@ portable across Windows, macOS, and Linux.
 afmt [OPTIONS] <PATH>...
 ```
 
+- A lone `-` path reads one complete Apex source buffer from stdin and writes
+  only the formatted source to stdout. It cannot be combined with another
+  path, `--write`, or `--check`; those combinations are usage errors with exit
+  status `2`.
+- Stdin mode uses the same formatter as file inputs. Configuration is explicit:
+  `-c/--config` is honored, but `.afmt.toml` is never discovered implicitly for
+  stdin. Formatting and parsing errors are written to stderr, produce exit
+  status `1`, and write no partial stdout.
 - Without `--write` or `--check`, formatted source is written to stdout.
 - A selection containing exactly one file prints plain formatted source.
 - A selection containing two or more files separates each source block with a
@@ -64,6 +72,8 @@ afmt [OPTIONS] <PATH>...
   conflicts with `--write`.
 - `--time` writes per-file and total timing diagnostics to stderr. It does not
   alter formatted stdout.
+- `--time` is ignored for stdin input; stdin output remains a pure formatted
+  source stream with no timing or summary diagnostics.
 - Bulk operations report selected, changed, written, unchanged, failed, and
   elapsed counts on stderr.
 
