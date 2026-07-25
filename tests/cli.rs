@@ -1,6 +1,7 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn temporary_directory() -> PathBuf {
@@ -21,6 +22,24 @@ fn run_cli(directory: &Path, args: &[&str]) -> Output {
         .expect("afmt should run")
 }
 
+fn run_cli_with_stdin(directory: &Path, args: &[&str], source: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_afmt"))
+        .current_dir(directory)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("afmt should run");
+    child
+        .stdin
+        .take()
+        .expect("stdin should be available")
+        .write_all(source.as_bytes())
+        .expect("source should be written to stdin");
+    child.wait_with_output().expect("afmt should finish")
+}
+
 fn write_fixture(path: &Path) {
     fs::write(path, include_str!("static/variable_declaration.in"))
         .expect("fixture should be written");
@@ -38,6 +57,117 @@ fn single_file_dry_run_keeps_stdout_as_plain_formatted_source() {
     assert!(stdout.starts_with("class A {"));
     assert!(!stdout.contains("==>"));
     assert!(output.stderr.is_empty());
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_formats_source_without_diagnostics_and_is_idempotent() {
+    let directory = temporary_directory();
+    let source = include_str!("static/variable_declaration.in");
+    let expected = include_str!("static/variable_declaration.cls");
+
+    let output = run_cli_with_stdin(&directory, &["-"], source);
+    assert!(output.status.success());
+    assert_eq!(output.stdout, expected.as_bytes());
+    assert!(output.stderr.is_empty());
+
+    let second = run_cli_with_stdin(&directory, &["-"], expected);
+    assert!(second.status.success());
+    assert_eq!(second.stdout, output.stdout);
+    assert!(second.stderr.is_empty());
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_honors_explicit_config() {
+    let directory = temporary_directory();
+    let config = directory.join("custom.toml");
+    fs::write(&config, "indent_size = 4\n").expect("config should be written");
+
+    let output = run_cli_with_stdin(
+        &directory,
+        &["-c", config.to_str().unwrap(), "-"],
+        "class A{Integer value;}\n",
+    );
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("    Integer value;"));
+    assert!(output.stderr.is_empty());
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn empty_stdin_preserves_the_printer_trailing_newline_contract() {
+    let directory = temporary_directory();
+
+    let output = run_cli_with_stdin(&directory, &["-"], "");
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"\n");
+    assert!(output.stderr.is_empty());
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_ignores_time_without_polluting_formatted_stdout_or_stderr() {
+    let directory = temporary_directory();
+    let source = include_str!("static/variable_declaration.in");
+    let expected = include_str!("static/variable_declaration.cls");
+
+    let output = run_cli_with_stdin(&directory, &["--time", "-"], source);
+    assert!(output.status.success());
+    assert_eq!(output.stdout, expected.as_bytes());
+    assert!(output.stderr.is_empty());
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_format_error_has_no_partial_stdout_or_panic_banner() {
+    let directory = temporary_directory();
+
+    let output = run_cli_with_stdin(&directory, &["-"], "class Broken {");
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    assert!(stderr.contains("Error:"));
+    assert!(!stderr.contains("panicked at"));
+    assert!(!stderr.contains("thread '"));
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_formatter_panic_is_a_normal_error_without_a_panic_banner() {
+    let directory = temporary_directory();
+    let source = include_str!("battle_test/repos/ApexTestKit/scripts/apex/demo-campaign.apex");
+
+    let output = run_cli_with_stdin(&directory, &["-"], source);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    assert_eq!(stderr.matches("Error:").count(), 1, "stderr: {stderr}");
+    assert!(stderr.contains("Formatting panicked:"));
+    assert!(!stderr.contains("panicked at"));
+    assert!(!stderr.contains("thread '"));
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn stdin_rejects_other_paths_write_and_check() {
+    let directory = temporary_directory();
+
+    for args in [["-", "other.cls"], ["--write", "-"], ["--check", "-"]] {
+        let output = run_cli(&directory, &args);
+        assert_eq!(output.status.code(), Some(2), "args: {args:?}");
+        assert!(output.stdout.is_empty(), "args: {args:?}");
+        let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+        assert!(stderr.contains("stdin path '-'"), "stderr: {stderr}");
+    }
 
     fs::remove_dir_all(directory).expect("temporary directory should be removed");
 }
