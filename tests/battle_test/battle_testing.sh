@@ -178,6 +178,12 @@ import sys
 root = sys.argv[1]
 path_pattern = re.compile(r"^[ \t]*[A-Za-z_][A-Za-z0-9_]*(\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*[ \t]*$")
 dot_pattern = re.compile(r"^[ \t]*\??\.[A-Za-z_]")
+# `this` and `super` are value expressions, not type or namespace references.
+# A newline before their member access is legal Apex (the whitespace-before-dot
+# compile error applies only to type/namespace paths), so afmt intentionally
+# breaks these chains. Only genuine type/namespace splits are violations, so
+# chains whose head segment is one of these keywords are not flagged.
+breakable_head_keywords = {"this", "super"}
 violations = []
 
 for directory, _, filenames in os.walk(root):
@@ -194,8 +200,12 @@ for directory, _, filenames in os.walk(root):
             previous = index - 1
             while previous >= 0 and not lines[previous].strip():
                 previous -= 1
-            if previous >= 0 and path_pattern.match(lines[previous]):
-                violations.append((path, previous + 1))
+            if previous < 0 or not path_pattern.match(lines[previous]):
+                continue
+            head_segment = lines[previous].strip().split(".", 1)[0].strip()
+            if head_segment in breakable_head_keywords:
+                continue
+            violations.append((path, previous + 1))
 
 if violations:
     print(f"Name-path break check failed: {len(violations)} site(s)")
