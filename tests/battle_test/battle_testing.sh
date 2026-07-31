@@ -236,7 +236,9 @@ START_TIME=$(date +%s)
 # unexpected failures retain file-specific diagnostics.
 run_bulk_format() {
     set +e
-    "$FORMATTER_BINARY" --config "$BATTLE_CONFIG" "$TARGET_DIR" \
+    # The checks below inspect the cloned files, so write the formatted output
+    # before checking for name-path breaks and idempotency.
+    "$FORMATTER_BINARY" --config "$BATTLE_CONFIG" --write "$TARGET_DIR" \
         > /dev/null 2> "$BULK_ERROR_LOG"
     local exit_code=$?
     set -e
