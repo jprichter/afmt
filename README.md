@@ -223,8 +223,8 @@ afmt's existing style (` * content`). In either mode, afmt normalizes the
 separator after the star to one space.
 
 When `indent_style = "tab"`, `indent_size` controls the number of columns per
-indent level. Line wrapping measures each emitted tab as one logical column;
-visual tab stops may therefore differ from `max_width` calculations.
+indent level, and line wrapping accounts for that configured width when applying
+`max_width`.
 
 When `normalize_annotation_casing = true`, known Apex annotation names are
 written with Salesforce's canonical casing, such as `@IsTest`, `@TestSetup`,

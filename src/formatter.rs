@@ -901,6 +901,31 @@ mod tests {
     }
 
     #[test]
+    fn tab_indentation_counts_configured_width_for_line_wrapping() {
+        let source = "class T {\n  void m() {\n    System.debug('12345678901234567890');\n  }\n}\n";
+        let config = Config {
+            max_width: 40,
+            indent_size: 4,
+            indent_style: IndentStyle::Tab,
+            ..Config::default()
+        };
+        let max_width = config.max_width;
+
+        let output = Formatter::format_one(source, config);
+
+        assert_eq!(
+            output,
+            "class T {\n\tvoid m() {\n\t\tSystem.debug(\n\t\t\t'12345678901234567890'\n\t\t);\n\t}\n}\n"
+        );
+        assert!(output.lines().all(|line| {
+            line.chars()
+                .map(|character| if character == '\t' { 4 } else { 1 })
+                .sum::<u32>()
+                <= max_width
+        }));
+    }
+
+    #[test]
     fn indent_size_one_is_idempotent_for_spaces_and_tabs() {
         let source = "class T {\n  void m() {\n    if (a) x();\n  }\n}\n";
         let space_config = Config {

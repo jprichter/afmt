@@ -24,7 +24,8 @@ normalize_annotation_casing = false
 
 `indent_style` selects spaces or tabs for emitted indentation. `indent_size`
 controls the logical indentation width; with tabs, it is the number of columns
-represented by each indentation level.
+represented by each indentation level. Line wrapping uses that logical width
+when applying `max_width`.
 
 `javadoc_star_column` controls only the leading star on continuation lines in
 Javadoc (`/** ... */`) comments:
