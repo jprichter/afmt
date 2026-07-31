@@ -14,6 +14,8 @@ The battle test is an external-corpus gate. It clones the repositories listed
 in `tests/battle_test/repos.txt` into the disposable
 `tests/battle_test/repos` directory, runs the bulk command, and retains a
 per-file diagnostic fallback for tolerated managed-package template failures.
+The bulk command writes the formatted output into the disposable clones before
+the structural checks inspect them.
 Use `--idempotent` to run bulk `--write` followed by bulk `--check`:
 
 ```bash

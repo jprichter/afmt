@@ -143,7 +143,7 @@ fn stdin_format_error_has_no_partial_stdout_or_panic_banner() {
 #[test]
 fn stdin_formatter_panic_is_a_normal_error_without_a_panic_banner() {
     let directory = temporary_directory();
-    let source = include_str!("battle_test/repos/ApexTestKit/scripts/apex/demo-campaign.apex");
+    let source = include_str!("fixtures/demo-campaign.apex");
 
     let output = run_cli_with_stdin(&directory, &["-"], source);
     assert_eq!(output.status.code(), Some(1));

@@ -12,12 +12,12 @@ RUNS="${AFMT_BENCH_RUNS:-5}"
 FORMATTER_BINARY="$PROJECT_DIR/target/release/afmt"
 BATTLE_CONFIG="$SCRIPT_DIR/.afmt.toml"
 
-if [ -z "$CORPUS_DIR" ] || [ ! -d "$CORPUS_DIR" ]; then
-    echo "Usage: $0 CORPUS_DIRECTORY" >&2
-    exit 2
-fi
 if ! [[ "$RUNS" =~ ^[0-9]+$ ]] || (( 10#$RUNS < 3 )) || (( 10#$RUNS % 2 == 0 )); then
     echo "AFMT_BENCH_RUNS must be an odd integer of at least 3" >&2
+    exit 2
+fi
+if [ -z "$CORPUS_DIR" ] || [ ! -d "$CORPUS_DIR" ]; then
+    echo "Usage: $0 CORPUS_DIRECTORY" >&2
     exit 2
 fi
 
