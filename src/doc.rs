@@ -259,7 +259,7 @@ impl<'a> PrettyPrinter<'a> {
                 for _ in 0..indent / self.indent_size {
                     result.push('\t');
                 }
-                self.col = indent / self.indent_size;
+                self.col = indent;
             }
         }
     }
