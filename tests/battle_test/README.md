@@ -1,10 +1,10 @@
 # Battle tests
 
 `battle_testing.sh` clones the disposable repositories listed in
-`repos.txt`, runs one bulk directory formatting command, and redirects
-formatted stdout. The selection is configured by `.afmt.toml`; it preserves
-the legacy `.sfdx` and `scripts` pruning in addition to afmt's standard
-repository exclusions.
+`repos.txt`, runs one bulk directory formatting command, and writes the
+formatted output into those disposable clones. The selection is configured by
+`.afmt.toml`; it preserves the legacy `.sfdx` and `scripts` pruning in addition
+to afmt's standard repository exclusions.
 
 If the bulk command reports a failure, the script captures its stderr and runs
 the legacy per-file classifier. That fallback recognizes tolerated managed
