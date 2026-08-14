@@ -10,6 +10,7 @@ mod enum_def;
 pub mod formatter;
 mod formatting_session;
 pub mod message_helper;
+mod source_formatter;
 mod utility;
 use formatter::Formatter;
 
