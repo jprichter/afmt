@@ -99,8 +99,12 @@ both:
 
 ## Implementation boundaries
 
-`src/config.rs` owns application-level TOML loading and file-selection
-defaults. `src/discovery.rs` owns path expansion, glob matching, exclusions,
-de-duplication, and ordering. `src/formatter.rs` owns formatting and
-path-aware per-file outcomes. `src/main.rs` owns CLI output, check/write
-policy, timing, and aggregate status.
+`src/source_formatter.rs` owns the source-to-source formatting core and
+formatter configuration validation. `src/formatter.rs` provides the public
+1.x compatibility surface and owns file reads, path-aware per-file outcomes,
+elapsed timing, and Rayon batch execution. `src/config.rs` owns
+application-level TOML loading and file-selection defaults. `src/discovery.rs`
+owns path expansion, glob matching, exclusions, de-duplication, and ordering.
+`src/main.rs` owns CLI output, check/write policy, timing display, and aggregate
+status. See [Formatter architecture](formatter-architecture.md) for the
+boundary details.
