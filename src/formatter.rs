@@ -1,12 +1,9 @@
-use crate::context::CommentMap;
 use crate::data_model::*;
 use crate::doc::{pretty_print, PrettyConfig};
 use crate::doc_builder::DocBuilder;
+use crate::formatting_session::FormattingSession;
 use crate::message_helper::{red, yellow};
-use crate::utility::{
-    assert_no_missing_comments, clear_thread_comment_map, clear_thread_source_code,
-    collect_comments, enrich, set_thread_comment_map, set_thread_source_code, truncate_snippet,
-};
+use crate::utility::{assert_no_missing_comments, enrich, truncate_snippet};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::{
@@ -135,15 +132,6 @@ pub struct FormatOutcome {
     pub result: Result<FormattedFile, FormatFileError>,
 }
 
-struct ThreadStateGuard;
-
-impl Drop for ThreadStateGuard {
-    fn drop(&mut self) {
-        clear_thread_source_code();
-        clear_thread_comment_map();
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Formatter {
     config: Config,
@@ -264,16 +252,7 @@ impl Formatter {
             .map_err(|error| format!("Invalid formatter configuration: {error}"))?;
 
         let ast_tree = Self::try_parse(source_code)?;
-        clear_thread_source_code();
-        clear_thread_comment_map();
-        let _thread_state_guard = ThreadStateGuard;
-
-        set_thread_source_code(source_code.to_string()); // important to set thread level source code now;
-
-        let mut cursor = ast_tree.walk();
-        let mut comment_map = CommentMap::new();
-        collect_comments(&mut cursor, &mut comment_map);
-        set_thread_comment_map(comment_map); // important to set thread level comment map;
+        let _session = FormattingSession::new(source_code, &ast_tree);
 
         // traverse the tree to build enriched data
         let root: Root = enrich(&ast_tree);
@@ -637,6 +616,23 @@ mod tests {
             .all(|(formatted, cleaned)| *formatted && *cleaned));
         assert!(crate::utility::thread_state_is_empty());
         fs::remove_dir_all(directory).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn caught_formatter_panics_release_formatting_state() {
+        let source = "class T { void m() { if (true) { if (true) {} } } }";
+        let result = Formatter::try_format_source(
+            source,
+            Config {
+                indent_size: u32::MAX,
+                ..Config::default()
+            },
+        );
+
+        assert!(result
+            .expect_err("the oversized indentation should panic during printing")
+            .contains("Formatting panicked"));
+        assert!(crate::utility::thread_state_is_empty());
     }
 
     #[cfg(unix)]
