@@ -6,8 +6,12 @@ focused project documentation below.
 
 - Formatter configuration and style behavior:
   [docs/configuration.md](docs/configuration.md)
+- Formatter source-core and file/batch-adapter boundaries:
+  [docs/formatter-architecture.md](docs/formatter-architecture.md)
 - Comment placement and formatter idempotency:
   [docs/comment-placement-and-idempotency.md](docs/comment-placement-and-idempotency.md)
+- Name-path chain formatting:
+  [docs/name-path-chain-formatting.md](docs/name-path-chain-formatting.md)
 - User-facing bulk formatting, configuration, discovery, and CLI semantics:
   [docs/project-wide-formatting.md](docs/project-wide-formatting.md)
 - Test, battle-corpus, and local benchmark workflow:
