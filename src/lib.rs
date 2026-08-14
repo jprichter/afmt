@@ -8,6 +8,7 @@ mod doc;
 mod doc_builder;
 mod enum_def;
 pub mod formatter;
+mod formatting_session;
 pub mod message_helper;
 mod utility;
 use formatter::Formatter;
