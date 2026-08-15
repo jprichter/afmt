@@ -66,6 +66,12 @@ mod tests {
     }
 
     #[test]
+    fn ignore() {
+        let (total, failed) = run_scenario("tests/ignore", "ignore");
+        assert_eq!(failed, 0, "{} out of {} tests failed", failed, total);
+    }
+
+    #[test]
     fn idempotency_static() {
         run_idempotency("tests/static", "static", "tests/configs/.afmt_static.toml");
     }
@@ -95,6 +101,16 @@ mod tests {
             "configurable_style",
             "tests/configs/.afmt_configurable_style.toml",
         );
+    }
+
+    #[test]
+    fn idempotency_ignore_formatted_output() {
+        let source = std::fs::read_to_string("tests/ignore/IgnoreDirective.cls")
+            .expect("ignore expected output should be readable");
+        let first = Formatter::format_one(&source, Config::default());
+        let second = Formatter::format_one(&first, Config::default());
+
+        assert_eq!(first, second);
     }
 
     #[test]
@@ -246,6 +262,7 @@ mod tests {
             "prettier80" => run_prettier_test_files(source, "p80"),
             "comments" => run_static_test_files(source),
             "configurable_style" => run_configurable_style_test_files(source),
+            "ignore" => run_static_test_files(source),
             _ => panic!("Unknown scenario: {}", scenario_name),
         });
 

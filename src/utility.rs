@@ -99,6 +99,25 @@ pub fn get_comment_map() -> CommentMap {
     })
 }
 
+fn mark_comments_in_range_as_printed(start_byte: usize, end_byte: usize) {
+    THREAD_COMMENT_MAP.with(|cm| {
+        if let Some(comment_map) = cm.borrow().as_ref() {
+            for bucket in comment_map.values() {
+                for comment in bucket
+                    .pre_comments
+                    .iter()
+                    .chain(bucket.post_comments.iter())
+                    .chain(bucket.dangling_comments.iter())
+                {
+                    if comment.start_byte >= start_byte && comment.end_byte <= end_byte {
+                        comment.mark_as_printed();
+                    }
+                }
+            }
+        }
+    });
+}
+
 #[allow(dead_code)]
 pub fn print_comment_map(tree: &Tree) {
     let comment_map = get_comment_map();
@@ -362,6 +381,25 @@ pub fn build_with_comments_core<'a, F>(
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
     let bucket = get_comment_bucket(&node_context.id);
+
+    if let Some(ignore_comment) = bucket
+        .pre_comments
+        .last()
+        .filter(|comment| comment.value.trim() == "// afmt:ignore")
+    {
+        let mut comments_before_ignore = bucket.clone();
+        comments_before_ignore.pre_comments.pop();
+        handle_pre_comments(b, &comments_before_ignore, result);
+
+        let verbatim = with_source_code(|source| {
+            source[node_context.start_byte..node_context.end_byte].to_string()
+        });
+        result.push(b.txt(verbatim));
+        ignore_comment.mark_as_printed();
+        mark_comments_in_range_as_printed(node_context.start_byte, node_context.end_byte);
+        return;
+    }
+
     handle_pre_comments(b, &bucket, result);
 
     if bucket.dangling_comments.is_empty() {
@@ -677,6 +715,7 @@ pub fn is_bracket_composite_node(node: &Node) -> bool {
 mod tests {
     use super::is_pure_name_path;
     use super::truncate_snippet;
+    use crate::formatter::{Config, Formatter};
     use tree_sitter::{Node, Parser};
 
     fn find_node<'a>(node: Node<'a>, kind: &str, source: &'a str, text: &str) -> Option<Node<'a>> {
@@ -700,6 +739,16 @@ mod tests {
 
         assert_eq!(truncated, format!("{}…", "a".repeat(79)));
         assert!(std::str::from_utf8(truncated.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn ignore_directive_is_consumed_from_formatted_output() {
+        let source = "class Example {\n  // afmt:ignore\n  void   run( ) { return; }\n}\n";
+
+        let formatted = Formatter::format_one(source, Config::default());
+
+        assert!(!formatted.contains("afmt:ignore"));
+        assert!(formatted.contains("void   run( ) { return; }"));
     }
 
     fn assert_name_path(source: &str, kind: &str, text: &str, expected: bool) {
