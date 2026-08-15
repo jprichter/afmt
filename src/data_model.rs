@@ -3639,6 +3639,8 @@ impl<'a> DocBuild<'a> for SwitchRule {
 }
 
 #[derive(Debug)]
+// Boxing this AST variant may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum SwitchLabel {
     WhenSObject(WhenSObjectType),
     Expressions(Vec<Expression>),

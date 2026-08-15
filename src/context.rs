@@ -17,6 +17,8 @@ pub type CommentMap = HashMap<usize, CommentBucket>;
 pub struct NodeContext {
     pub id: usize,
     pub punc: Option<Punctuation>,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 impl NodeContext {
@@ -25,6 +27,8 @@ impl NodeContext {
         Self {
             id: node.id(),
             punc: Punctuation::from(node),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
         }
     }
 
@@ -33,6 +37,8 @@ impl NodeContext {
         Self {
             id: node.id(),
             punc: Punctuation::from_inner(node),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
         }
     }
 
@@ -41,6 +47,8 @@ impl NodeContext {
         Self {
             id: node.id(),
             punc: None,
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
         }
     }
 }
@@ -75,6 +83,8 @@ pub struct Comment {
     pub comment_type: CommentType,
     pub metadata: CommentMetadata,
     pub is_printed: Rc<Cell<bool>>,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 impl Comment {
@@ -99,6 +109,8 @@ impl Comment {
             comment_type,
             metadata,
             is_printed: Rc::new(Cell::new(false)),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
         }
     }
 

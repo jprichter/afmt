@@ -248,6 +248,12 @@ and contributor validation workflow, see
 [the project-wide formatting guide](docs/project-wide-formatting.md) and
 [the validation and benchmark guide](docs/validation-and-benchmarks.md).
 
+### Ignoring a node
+
+Place `// afmt:ignore` immediately before a statement or declaration to keep
+that node's original source formatting while the rest of the file is formatted
+normally. The directive is consumed and is not included in the output.
+
 <br>
 
 ## ❓ FAQ

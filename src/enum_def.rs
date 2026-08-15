@@ -54,6 +54,8 @@ impl<'a> DocBuild<'a> for RootMember {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum ClassMember {
     Field(Box<FieldDeclaration>),
     NestedClass(Box<ClassDeclaration>),
@@ -114,6 +116,8 @@ impl<'a> DocBuild<'a> for ClassMember {
 }
 
 #[derive(Debug)]
+// Boxing these AST variants may affect formatter performance and is tracked separately in md/TODO.md.
+#[allow(clippy::large_enum_variant)]
 pub enum UnannotatedType {
     Simple(SimpleType),
     Array(Box<ArrayType>),
