@@ -30,6 +30,17 @@ following Apex node.
 These placements are attachment behavior, not alternate brace or indentation
 styles.
 
+## Ignored nodes
+
+`// afmt:ignore` is consumed when it is the last pre-comment for a node. The
+node's original source bytes are emitted unchanged, including internal blank
+lines, while the marker itself is omitted from the output. This is an
+intentional escape hatch from normal formatting, so a deliberately
+non-canonical ignored node can be reformatted on a later invocation: once the
+marker has been consumed, a new formatting run has no way to identify that
+node. The idempotency guarantee applies when the preserved bytes are already
+stable, as covered by `idempotency_ignore_directive_stable_output`.
+
 ## Implementation boundaries
 
 - `src/utility.rs::collect_comments` attaches same-row comments after an
