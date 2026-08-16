@@ -59,6 +59,11 @@ The static fixtures under `tests/static/` cover the method-chain and unbraced
 `idempotency_static` test formats each fixture twice with the same
 `tests/configs/.afmt_static.toml` configuration.
 
+The ignore directive fixtures under `tests/ignore/` cover verbatim preservation
+of a deliberately non-canonical node, internal blank lines, surrounding normal
+formatting, and stable marker-bearing output. The `ignore` scenario and
+`idempotency_ignore_directive_stable_output` test exercise that coverage.
+
 Run the focused checks while iterating:
 
 ```bash

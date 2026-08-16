@@ -250,9 +250,13 @@ and contributor validation workflow, see
 
 ### Ignoring a node
 
-Place `// afmt:ignore` immediately before a statement or declaration to keep
-that node's original source formatting while the rest of the file is formatted
-normally. The directive is consumed and is not included in the output.
+Place `// afmt:ignore` as the last pre-comment for a node (such as a statement
+or declaration) to preserve that node's original source bytes, including its
+internal whitespace and blank lines, while the rest of the file is formatted
+normally. The directive is consumed and is not included in the output. Because
+the marker is consumed, deliberately non-canonical ignored source may be
+reformatted on a later invocation; see the [comment placement and idempotency
+guide](docs/comment-placement-and-idempotency.md) for the exact behavior.
 
 <br>
 
