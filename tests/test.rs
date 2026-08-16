@@ -104,12 +104,15 @@ mod tests {
     }
 
     #[test]
-    fn idempotency_ignore_formatted_output() {
-        let source = std::fs::read_to_string("tests/ignore/IgnoreDirective.cls")
+    fn idempotency_ignore_directive_stable_output() {
+        let source = std::fs::read_to_string("tests/ignore/IgnoreDirectiveStable.in")
+            .expect("ignore source fixture should be readable");
+        let expected = std::fs::read_to_string("tests/ignore/IgnoreDirectiveStable.cls")
             .expect("ignore expected output should be readable");
         let first = Formatter::format_one(&source, Config::default());
         let second = Formatter::format_one(&first, Config::default());
 
+        assert_eq!(first, expected);
         assert_eq!(first, second);
     }
 
