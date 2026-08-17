@@ -11,6 +11,7 @@ pub enum Doc<'a> {
     NewlineWithNoIndent,
     ForceBreak,        // immediately use multi-line mode in choice(x, y) or group()
     Text(String, u32), // The given text should not contain line breaks
+    Verbatim(String),  // Preserves source bytes and may contain line breaks
     Softline,          // a space or a newline
     Maybeline,         // empty or a newline
     Flat(DocRef<'a>),
@@ -207,6 +208,19 @@ impl<'a> PrettyPrinter<'a> {
                         self.col += width;
                     }
                 }
+                Doc::Verbatim(text) => {
+                    if newline_buffer.is_pending() {
+                        self.insert_newline_with_indent(&mut result, newline_buffer.get_indent());
+                        newline_buffer.clear();
+                    }
+
+                    result.push_str(text);
+                    self.col = text
+                        .rsplit_once('\n')
+                        .map_or(self.col + text.len() as u32, |(_, last_line)| {
+                            last_line.len() as u32
+                        });
+                }
                 Doc::Flat(x) => self.chunks.push(chunk.flat(x)),
                 Doc::Indent(i, x) => self.chunks.push(chunk.indented(*i, x)),
                 Doc::Dedent(i, x) => self.chunks.push(chunk.dedented(*i, x)),
@@ -316,6 +330,18 @@ impl<'a> PrettyPrinter<'a> {
                 }
                 Doc::Text(_, text_width) => {
                     if *text_width <= remaining_width {
+                        remaining_width -= text_width;
+                    } else {
+                        return false;
+                    }
+                }
+                Doc::Verbatim(text) => {
+                    if text.contains('\n') {
+                        return false;
+                    }
+
+                    let text_width = text.len() as u32;
+                    if text_width <= remaining_width {
                         remaining_width -= text_width;
                     } else {
                         return false;
