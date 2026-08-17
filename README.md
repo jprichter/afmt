@@ -250,12 +250,18 @@ and contributor validation workflow, see
 
 ### Ignoring a node
 
-Place `// afmt:ignore` as the last pre-comment for a node (such as a statement
-or declaration) to preserve that node's original source bytes, including its
-internal whitespace and blank lines, while the rest of the file is formatted
-normally. The directive is consumed and is not included in the output. Because
-the marker is consumed, deliberately non-canonical ignored source may be
-reformatted on a later invocation; see the [comment placement and idempotency
+Place `// afmt:ignore`, `//afmt:ignore`, or `/* afmt:ignore */` as the last
+standalone pre-comment for a node (such as a statement or declaration) to
+preserve that node's original source bytes, including internal whitespace and
+blank lines. A marker between annotations and a declaration applies to the
+complete declaration. The directive is consumed and omitted from the output.
+Multiline preserved source keeps its authored interior indentation and forces
+surrounding layout to break; afmt does not re-anchor its interior lines.
+
+If a recognized marker has no eligible following node, afmt preserves it and
+writes a warning to stderr. Because an honored marker is consumed,
+deliberately non-canonical ignored source may be reformatted on a later
+invocation; see the [comment placement and idempotency
 guide](docs/comment-placement-and-idempotency.md) for the exact behavior.
 
 <br>
