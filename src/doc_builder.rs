@@ -195,6 +195,10 @@ impl<'a> DocBuilder<'a> {
         self.arena.alloc(Doc::Text(s, width))
     }
 
+    pub fn verbatim(&'a self, text: impl ToString) -> DocRef<'a> {
+        self.arena.alloc(Doc::Verbatim(text.to_string()))
+    }
+
     pub fn _txt(&'a self, text: impl ToString) -> DocRef<'a> {
         let s = text.to_string();
         let space_s = format!(" {}", s);

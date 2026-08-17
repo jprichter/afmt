@@ -117,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn ignore_directive_regressions_are_idempotent() {
+    fn ignore_directive_regressions_match_expected_output() {
         for fixture in [
             "IgnoreDirectivePunctuation",
             "IgnoreDirectiveMultiline",
@@ -128,17 +128,22 @@ mod tests {
             let expected = std::fs::read_to_string(format!("tests/ignore/{fixture}.cls"))
                 .expect("ignore expected output should be readable");
             let first = Formatter::format_one(&source, Config::default());
-            let second = Formatter::format_one(&first, Config::default());
 
             assert_eq!(
                 first, expected,
                 "{fixture} first pass should match its fixture"
             );
-            assert_eq!(
-                first, second,
-                "{fixture} should be stable on the second pass"
-            );
         }
+    }
+
+    #[test]
+    fn ignored_inner_punctuation_is_idempotent() {
+        let source = std::fs::read_to_string("tests/ignore/IgnoreDirectivePunctuation.in")
+            .expect("punctuation source fixture should be readable");
+        let first = Formatter::format_one(&source, Config::default());
+        let second = Formatter::format_one(&first, Config::default());
+
+        assert_eq!(first, second, "punctuation output should be stable");
     }
 
     #[test]

@@ -395,7 +395,7 @@ where
         let verbatim = with_source_code(|source| {
             source[node_context.start_byte..node_context.end_byte].to_string()
         });
-        result.push(b.txt(verbatim));
+        result.push(b.verbatim(verbatim));
         ignore_comment.mark_as_printed();
         mark_comments_in_range_as_printed(node_context.start_byte, node_context.end_byte);
         return true;
