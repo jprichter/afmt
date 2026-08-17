@@ -309,6 +309,8 @@ impl CommentMetadata {
 pub struct Punctuation {
     pub type_: PuncuationType,
     pub id: usize,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 impl Punctuation {
@@ -317,10 +319,14 @@ impl Punctuation {
             "," => Self {
                 type_: PuncuationType::Comma,
                 id: node.id(),
+                start_byte: node.start_byte(),
+                end_byte: node.end_byte(),
             },
             ";" => Self {
                 type_: PuncuationType::Semicolon,
                 id: node.id(),
+                start_byte: node.start_byte(),
+                end_byte: node.end_byte(),
             },
             _ => panic_unknown_node(node, "Puncuation"),
         }
@@ -353,6 +359,10 @@ impl Punctuation {
             }
         }
         None
+    }
+
+    pub fn is_within(&self, start_byte: usize, end_byte: usize) -> bool {
+        self.start_byte >= start_byte && self.end_byte <= end_byte
     }
 
     pub fn build_comments<'a>(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
