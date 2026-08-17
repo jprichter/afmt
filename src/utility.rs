@@ -197,6 +197,22 @@ pub fn is_punctuation_node(node: &Node) -> bool {
     matches!(node.kind(), "," | ";")
 }
 
+pub fn is_ignore_directive(comment: &Comment) -> bool {
+    let value = comment.value.trim();
+    let directive = if let Some(value) = value.strip_prefix("//") {
+        value
+    } else if let Some(value) = value
+        .strip_prefix("/*")
+        .and_then(|value| value.strip_suffix("*/"))
+    {
+        value
+    } else {
+        return false;
+    };
+
+    directive.trim() == "afmt:ignore"
+}
+
 fn is_associable_unnamed_node(node: &Node) -> bool {
     is_punctuation_node(node) || matches!(node.kind(), "else")
 }
@@ -309,6 +325,27 @@ pub fn collect_comments(cursor: &mut TreeCursor, comment_map: &mut CommentMap) {
             // It's an associable node
             let child_id = child.id();
 
+            // A directive between annotations and a declaration can be attached
+            // to the declaration's first modifier. Promote it to the enclosing
+            // declaration so the complete declaration is preserved verbatim.
+            if node.kind() == "modifiers"
+                && child.kind() == "modifier"
+                && pending_pre_comments.last().is_some_and(is_ignore_directive)
+            {
+                let ignore_comment = pending_pre_comments
+                    .pop()
+                    .expect("ignore directive was present");
+                if let Some(parent) = node.parent() {
+                    comment_map
+                        .entry(parent.id())
+                        .or_insert_with(CommentBucket::new)
+                        .pre_comments
+                        .push(ignore_comment);
+                } else {
+                    pending_pre_comments.push(ignore_comment);
+                }
+            }
+
             // Assign any pending comments to the child's pre-comments
             if !pending_pre_comments.is_empty() {
                 comment_map
@@ -359,17 +396,13 @@ pub fn build_with_comments<'a, F>(
 ) where
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
-    let bucket = get_comment_bucket(&node_context.id);
-    handle_pre_comments(b, &bucket, result);
-
-    if bucket.dangling_comments.is_empty() {
-        handle_members(b, result);
-    } else {
-        result.push(b.concat(handle_dangling_comments(b, &bucket)));
-        return;
+    let ignored = build_with_comments_core(b, node_context, result, handle_members);
+    if !ignored {
+        let bucket = get_comment_bucket(&node_context.id);
+        if bucket.dangling_comments.is_empty() {
+            handle_post_comments(b, &bucket, result);
+        }
     }
-
-    handle_post_comments(b, &bucket, result);
 }
 
 pub fn build_with_comments_core<'a, F>(
@@ -386,14 +419,14 @@ where
     if let Some(ignore_comment) = bucket
         .pre_comments
         .last()
-        .filter(|comment| comment.value.trim() == "// afmt:ignore")
+        .filter(|comment| is_ignore_directive(comment))
     {
         let mut comments_before_ignore = bucket.clone();
         comments_before_ignore.pre_comments.pop();
         handle_pre_comments(b, &comments_before_ignore, result);
 
         let verbatim = with_source_code(|source| {
-            source[node_context.start_byte..node_context.end_byte].to_string()
+            verbatim_source_without_marker(source, node_context, ignore_comment)
         });
         result.push(b.verbatim(verbatim));
         ignore_comment.mark_as_printed();
@@ -410,6 +443,40 @@ where
     }
 
     false
+}
+
+fn verbatim_source_without_marker(
+    source: &str,
+    node_context: &NodeContext,
+    ignore_comment: &Comment,
+) -> String {
+    let source_span = &source[node_context.start_byte..node_context.end_byte];
+    if ignore_comment.start_byte < node_context.start_byte
+        || ignore_comment.end_byte > node_context.end_byte
+    {
+        return source_span.to_string();
+    }
+
+    let marker_start = ignore_comment.start_byte - node_context.start_byte;
+    let marker_end = ignore_comment.end_byte - node_context.start_byte;
+    let line_start = source_span[..marker_start]
+        .rfind('\n')
+        .map_or(0, |index| index + 1);
+    let line_end = source_span[marker_end..]
+        .find('\n')
+        .map_or(source_span.len(), |index| marker_end + index + 1);
+
+    if source_span[line_start..marker_start].trim().is_empty()
+        && source_span[marker_end..line_end].trim().is_empty()
+    {
+        format!("{}{}", &source_span[..line_start], &source_span[line_end..])
+    } else {
+        format!(
+            "{}{}",
+            &source_span[..marker_start],
+            &source_span[marker_end..]
+        )
+    }
 }
 
 pub fn build_with_comments_and_punc<'a, F>(

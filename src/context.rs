@@ -153,6 +153,13 @@ impl Comment {
 
 impl<'a> DocBuild<'a> for Comment {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
+        if crate::utility::is_ignore_directive(self) {
+            eprintln!(
+                "Warning: afmt:ignore could not be applied at byte {}; directive was preserved",
+                self.start_byte
+            );
+        }
+
         match self.comment_type {
             CommentType::Line => {
                 result.push(b.txt(&self.value));
