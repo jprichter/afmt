@@ -377,7 +377,8 @@ pub fn build_with_comments_core<'a, F>(
     node_context: &NodeContext,
     result: &mut Vec<DocRef<'a>>,
     handle_members: F,
-) where
+) -> bool
+where
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
     let bucket = get_comment_bucket(&node_context.id);
@@ -397,7 +398,7 @@ pub fn build_with_comments_core<'a, F>(
         result.push(b.txt(verbatim));
         ignore_comment.mark_as_printed();
         mark_comments_in_range_as_printed(node_context.start_byte, node_context.end_byte);
-        return;
+        return true;
     }
 
     handle_pre_comments(b, &bucket, result);
@@ -407,6 +408,8 @@ pub fn build_with_comments_core<'a, F>(
     } else {
         result.push(b.concat(handle_dangling_comments(b, &bucket)));
     }
+
+    false
 }
 
 pub fn build_with_comments_and_punc<'a, F>(
@@ -417,7 +420,7 @@ pub fn build_with_comments_and_punc<'a, F>(
 ) where
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
-    build_with_comments_core(b, node_context, result, handle_members);
+    let ignored = build_with_comments_core(b, node_context, result, handle_members);
 
     let bucket = get_comment_bucket(&node_context.id);
     if bucket.dangling_comments.is_empty() {
@@ -425,7 +428,9 @@ pub fn build_with_comments_and_punc<'a, F>(
     }
 
     if let Some(ref n) = node_context.punc {
-        result.push(n.build(b));
+        if !ignored || !n.is_within(node_context.start_byte, node_context.end_byte) {
+            result.push(n.build(b));
+        }
     }
 }
 
@@ -438,12 +443,14 @@ pub fn build_with_comments_and_punc_attached<'a, F>(
 ) where
     F: FnOnce(&'a DocBuilder<'a>, &mut Vec<DocRef<'a>>),
 {
-    build_with_comments_core(b, node_context, result, handle_members);
+    let ignored = build_with_comments_core(b, node_context, result, handle_members);
 
     let bucket = get_comment_bucket(&node_context.id);
 
     if let Some(ref n) = node_context.punc {
-        result.push(n.build(b));
+        if !ignored || !n.is_within(node_context.start_byte, node_context.end_byte) {
+            result.push(n.build(b));
+        }
     }
 
     if bucket.dangling_comments.is_empty() {

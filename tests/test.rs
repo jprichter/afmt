@@ -130,8 +130,14 @@ mod tests {
             let first = Formatter::format_one(&source, Config::default());
             let second = Formatter::format_one(&first, Config::default());
 
-            assert_eq!(first, expected, "{fixture} first pass should match its fixture");
-            assert_eq!(first, second, "{fixture} should be stable on the second pass");
+            assert_eq!(
+                first, expected,
+                "{fixture} first pass should match its fixture"
+            );
+            assert_eq!(
+                first, second,
+                "{fixture} should be stable on the second pass"
+            );
         }
     }
 
@@ -147,11 +153,7 @@ mod tests {
         ));
         fs::create_dir(&directory).unwrap();
         let source_path = directory.join("Warning.cls");
-        fs::write(
-            &source_path,
-            "public class Warning {}\n// afmt:ignore\n",
-        )
-        .unwrap();
+        fs::write(&source_path, "public class Warning {}\n// afmt:ignore\n").unwrap();
 
         let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
             .arg(&source_path)
