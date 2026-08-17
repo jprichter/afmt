@@ -117,6 +117,56 @@ mod tests {
     }
 
     #[test]
+    fn ignore_directive_regressions_are_idempotent() {
+        for fixture in [
+            "IgnoreDirectivePunctuation",
+            "IgnoreDirectiveMultiline",
+            "IgnoreDirectiveTargets",
+        ] {
+            let source = std::fs::read_to_string(format!("tests/ignore/{fixture}.in"))
+                .expect("ignore source fixture should be readable");
+            let expected = std::fs::read_to_string(format!("tests/ignore/{fixture}.cls"))
+                .expect("ignore expected output should be readable");
+            let first = Formatter::format_one(&source, Config::default());
+            let second = Formatter::format_one(&first, Config::default());
+
+            assert_eq!(first, expected, "{fixture} first pass should match its fixture");
+            assert_eq!(first, second, "{fixture} should be stable on the second pass");
+        }
+    }
+
+    #[test]
+    fn unhonored_ignore_directive_warns_and_is_preserved() {
+        let directory = std::env::temp_dir().join(format!(
+            "sf-afmt-ignore-directive-warning-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let source_path = directory.join("Warning.cls");
+        fs::write(
+            &source_path,
+            "public class Warning {}\n// afmt:ignore\n",
+        )
+        .unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg(&source_path)
+            .output()
+            .expect("failed to execute afmt");
+
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("// afmt:ignore"));
+        assert!(String::from_utf8_lossy(&output.stderr)
+            .contains("Warning: afmt:ignore could not be applied"));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn all() {
         let scenarios = [
             ("tests/static", "static"),
