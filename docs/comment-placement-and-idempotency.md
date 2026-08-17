@@ -32,14 +32,24 @@ styles.
 
 ## Ignored nodes
 
-`// afmt:ignore` is consumed when it is the last pre-comment for a node. The
-node's original source bytes are emitted unchanged, including internal blank
-lines, while the marker itself is omitted from the output. This is an
-intentional escape hatch from normal formatting, so a deliberately
-non-canonical ignored node can be reformatted on a later invocation: once the
-marker has been consumed, a new formatting run has no way to identify that
-node. The idempotency guarantee applies when the preserved bytes are already
-stable, as covered by `idempotency_ignore_directive_stable_output`.
+`// afmt:ignore`, `//afmt:ignore`, and `/* afmt:ignore */` are recognized when
+they are the last standalone pre-comment for a node. The node's original
+source bytes are emitted unchanged, including internal blank lines, while the
+marker itself is omitted from the output. A marker between annotations and a
+declaration applies to the complete declaration, rather than to its first
+modifier.
+
+Multiline preserved source forces its surrounding groups to break so width
+accounting remains correct. Its interior indentation is raw source and is not
+re-anchored to the formatter's current indentation level.
+
+If a recognized marker has no eligible following node, afmt retains the marker
+and emits a warning on stderr. This is an intentional escape hatch from normal
+formatting, so a deliberately non-canonical ignored node can be reformatted on
+a later invocation: once an honored marker has been consumed, a new formatting
+run has no way to identify that node. The idempotency guarantee applies when
+the preserved bytes are already stable, as covered by
+`idempotency_ignore_directive_stable_output`.
 
 ## Implementation boundaries
 
@@ -60,9 +70,10 @@ The static fixtures under `tests/static/` cover the method-chain and unbraced
 `tests/configs/.afmt_static.toml` configuration.
 
 The ignore directive fixtures under `tests/ignore/` cover verbatim preservation
-of a deliberately non-canonical node, internal blank lines, surrounding normal
-formatting, and stable marker-bearing output. The `ignore` scenario and
-`idempotency_ignore_directive_stable_output` test exercise that coverage.
+of deliberately non-canonical nodes, internal blank lines, multiline layout,
+inner punctuation, annotation and loop targeting, and recognized marker
+spellings. The `ignore` scenario, `ignored_inner_punctuation_is_idempotent`,
+and `idempotency_ignore_directive_stable_output` tests exercise that coverage.
 
 Run the focused checks while iterating:
 
@@ -70,6 +81,7 @@ Run the focused checks while iterating:
 cargo test --locked --test test idempotency_static
 cargo test --locked --test test statics
 cargo test --locked --test test comments
+cargo test --locked --test test ignore
 ```
 
 Run the complete locked Rust suite before handoff:
