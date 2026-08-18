@@ -179,6 +179,7 @@ mod tests {
             ("tests/static", "static"),
             ("tests/prettier80", "prettier80"),
             ("tests/comments", "comments"),
+            ("tests/ignore", "ignore"),
         ];
 
         let mut total_tests = 0;
