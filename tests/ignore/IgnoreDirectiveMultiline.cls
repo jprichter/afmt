@@ -3,6 +3,7 @@ public class IgnoreDirectiveMultiline {
     foo(
       bar,
       new Baz(
+        // afmt:ignore
         a
   + b,
         qqqq

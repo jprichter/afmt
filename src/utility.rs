@@ -210,7 +210,11 @@ pub fn is_ignore_directive(comment: &Comment) -> bool {
         return false;
     };
 
-    directive.trim() == "afmt:ignore"
+    // A free-text reason may follow the marker, as in `// afmt:ignore hand-aligned`.
+    directive
+        .split_whitespace()
+        .next()
+        .is_some_and(|marker| marker == "afmt:ignore")
 }
 
 fn is_associable_unnamed_node(node: &Node) -> bool {
@@ -421,12 +425,22 @@ where
         .last()
         .filter(|comment| is_ignore_directive(comment))
     {
-        let mut comments_before_ignore = bucket.clone();
-        comments_before_ignore.pre_comments.pop();
-        handle_pre_comments(b, &comments_before_ignore, result);
+        ignore_comment.mark_ignore_as_honored();
+
+        // A directive promoted past an annotation already sits inside the span
+        // that is preserved verbatim, so printing it again would duplicate it.
+        // Anywhere else it precedes the node and has to be printed explicitly,
+        // which is what keeps the marker available to the next formatting run.
+        if ignore_comment.is_within(node_context.start_byte, node_context.end_byte) {
+            let mut comments_before_ignore = bucket.clone();
+            comments_before_ignore.pre_comments.pop();
+            handle_pre_comments(b, &comments_before_ignore, result);
+        } else {
+            handle_pre_comments(b, &bucket, result);
+        }
 
         let verbatim = with_source_code(|source| {
-            verbatim_source_without_marker(source, node_context, ignore_comment)
+            source[node_context.start_byte..node_context.end_byte].to_string()
         });
         result.push(b.verbatim(verbatim));
         ignore_comment.mark_as_printed();
@@ -443,40 +457,6 @@ where
     }
 
     false
-}
-
-fn verbatim_source_without_marker(
-    source: &str,
-    node_context: &NodeContext,
-    ignore_comment: &Comment,
-) -> String {
-    let source_span = &source[node_context.start_byte..node_context.end_byte];
-    if ignore_comment.start_byte < node_context.start_byte
-        || ignore_comment.end_byte > node_context.end_byte
-    {
-        return source_span.to_string();
-    }
-
-    let marker_start = ignore_comment.start_byte - node_context.start_byte;
-    let marker_end = ignore_comment.end_byte - node_context.start_byte;
-    let line_start = source_span[..marker_start]
-        .rfind('\n')
-        .map_or(0, |index| index + 1);
-    let line_end = source_span[marker_end..]
-        .find('\n')
-        .map_or(source_span.len(), |index| marker_end + index + 1);
-
-    if source_span[line_start..marker_start].trim().is_empty()
-        && source_span[marker_end..line_end].trim().is_empty()
-    {
-        format!("{}{}", &source_span[..line_start], &source_span[line_end..])
-    } else {
-        format!(
-            "{}{}",
-            &source_span[..marker_start],
-            &source_span[marker_end..]
-        )
-    }
 }
 
 pub fn build_with_comments_and_punc<'a, F>(
@@ -816,13 +796,35 @@ mod tests {
     }
 
     #[test]
-    fn ignore_directive_is_consumed_from_formatted_output() {
+    fn ignore_directive_survives_formatting_with_its_node() {
         let source = "class Example {\n  // afmt:ignore\n  void   run( ) { return; }\n}\n";
 
-        let formatted = Formatter::format_one(source, Config::default());
+        let first = Formatter::format_one(source, Config::default());
+        let second = Formatter::format_one(&first, Config::default());
 
-        assert!(!formatted.contains("afmt:ignore"));
-        assert!(formatted.contains("void   run( ) { return; }"));
+        assert!(first.contains("// afmt:ignore"));
+        assert!(first.contains("void   run( ) { return; }"));
+        assert_eq!(
+            first, second,
+            "a preserved marker must keep preserving on later runs"
+        );
+    }
+
+    #[test]
+    fn ignore_directive_accepts_a_trailing_reason() {
+        let marker = |value: &str| {
+            let source = format!("class Example {{\n  {value}\n  Integer   x=1;\n}}\n");
+            Formatter::format_one(&source, Config::default()).contains("Integer   x=1;")
+        };
+
+        assert!(marker("// afmt:ignore"));
+        assert!(marker("//afmt:ignore"));
+        assert!(marker("/* afmt:ignore */"));
+        assert!(marker("// afmt:ignore column alignment is meaningful"));
+        assert!(marker("/* afmt:ignore see JIRA-123 */"));
+        assert!(!marker("// afmt:ignored"));
+        assert!(!marker("// afmt:ignore-next"));
+        assert!(!marker("// not a marker"));
     }
 
     fn assert_name_path(source: &str, kind: &str, text: &str, expected: bool) {

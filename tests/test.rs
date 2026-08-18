@@ -119,19 +119,30 @@ mod tests {
     #[test]
     fn ignore_directive_regressions_match_expected_output() {
         for fixture in [
+            "IgnoreDirective",
             "IgnoreDirectivePunctuation",
             "IgnoreDirectiveMultiline",
             "IgnoreDirectiveTargets",
+            "IgnoreDirectiveReason",
         ] {
             let source = std::fs::read_to_string(format!("tests/ignore/{fixture}.in"))
                 .expect("ignore source fixture should be readable");
             let expected = std::fs::read_to_string(format!("tests/ignore/{fixture}.cls"))
                 .expect("ignore expected output should be readable");
             let first = Formatter::format_one(&source, Config::default());
+            let second = Formatter::format_one(&first, Config::default());
 
             assert_eq!(
                 first, expected,
                 "{fixture} first pass should match its fixture"
+            );
+            assert!(
+                first.contains("afmt:ignore"),
+                "{fixture} should keep its directive available to later runs"
+            );
+            assert_eq!(
+                first, second,
+                "{fixture} should be stable once its directive is preserved"
             );
         }
     }
@@ -169,6 +180,39 @@ mod tests {
         assert!(String::from_utf8_lossy(&output.stdout).contains("// afmt:ignore"));
         assert!(String::from_utf8_lossy(&output.stderr)
             .contains("Warning: afmt:ignore could not be applied"));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn honored_ignore_directive_does_not_warn() {
+        let directory = std::env::temp_dir().join(format!(
+            "sf-afmt-ignore-directive-honored-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let source_path = directory.join("Honored.cls");
+        fs::write(
+            &source_path,
+            "public class Honored {\n  // afmt:ignore\n  Integer   x=1;\n}\n",
+        )
+        .unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg(&source_path)
+            .output()
+            .expect("failed to execute afmt");
+
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("// afmt:ignore"));
+        assert!(
+            !String::from_utf8_lossy(&output.stderr).contains("afmt:ignore"),
+            "an applied directive should not warn"
+        );
 
         fs::remove_dir_all(directory).unwrap();
     }
