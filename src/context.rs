@@ -83,6 +83,7 @@ pub struct Comment {
     pub comment_type: CommentType,
     pub metadata: CommentMetadata,
     pub is_printed: Rc<Cell<bool>>,
+    pub ignore_honored: Rc<Cell<bool>>,
     pub start_byte: usize,
     pub end_byte: usize,
 }
@@ -109,6 +110,7 @@ impl Comment {
             comment_type,
             metadata,
             is_printed: Rc::new(Cell::new(false)),
+            ignore_honored: Rc::new(Cell::new(false)),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
         }
@@ -146,6 +148,18 @@ impl Comment {
         self.is_printed.get()
     }
 
+    pub fn is_within(&self, start_byte: usize, end_byte: usize) -> bool {
+        self.start_byte >= start_byte && self.end_byte <= end_byte
+    }
+
+    pub fn mark_ignore_as_honored(&self) {
+        self.ignore_honored.set(true);
+    }
+
+    pub fn is_ignore_honored(&self) -> bool {
+        self.ignore_honored.get()
+    }
+
     pub fn mark_as_inline_post_comment(&mut self) {
         self.metadata.has_leading_content = true;
     }
@@ -153,7 +167,9 @@ impl Comment {
 
 impl<'a> DocBuild<'a> for Comment {
     fn build_inner(&self, b: &'a DocBuilder<'a>, result: &mut Vec<DocRef<'a>>) {
-        if crate::utility::is_ignore_directive(self) {
+        // An honored directive is printed alongside the source it preserves, so
+        // only warn when it reaches this path without having been applied.
+        if crate::utility::is_ignore_directive(self) && !self.is_ignore_honored() {
             eprintln!(
                 "Warning: afmt:ignore could not be applied at byte {}; directive was preserved",
                 self.start_byte

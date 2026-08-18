@@ -249,18 +249,29 @@ and contributor validation workflow, see
 
 ### Ignoring a node
 
-Place `// afmt:ignore`, `//afmt:ignore`, or `/* afmt:ignore */` as the last
-standalone pre-comment for a node (such as a statement or declaration) to
-preserve that node's original source bytes, including internal whitespace and
-blank lines. A marker between annotations and a declaration applies to the
-complete declaration. The directive is consumed and omitted from the output.
-Multiline preserved source keeps its authored interior indentation and forces
-surrounding layout to break; afmt does not re-anchor its interior lines.
+Place `// afmt:ignore` as the last standalone pre-comment for a node (such as a
+statement or declaration) to preserve that node's original source bytes,
+including internal whitespace and blank lines:
+
+```apex
+// afmt:ignore
+Integer[] matrix = new Integer[]{ 1, 0, 0,
+                                  0, 1, 0,
+                                  0, 0, 1 };
+```
+
+`//afmt:ignore` and `/* afmt:ignore */` work too, and the marker may carry a
+free-text reason, as in `// afmt:ignore column alignment is meaningful here`. A
+marker between annotations and a declaration applies to the complete
+declaration.
+
+The marker stays in the output, so an ignored node stays ignored on every later
+run and `afmt --check` passes on a file that `afmt --write` produced. Multiline
+preserved source keeps its authored interior indentation and forces surrounding
+layout to break; afmt does not re-anchor its interior lines.
 
 If a recognized marker has no eligible following node, afmt preserves it and
-writes a warning to stderr. Because an honored marker is consumed,
-deliberately non-canonical ignored source may be reformatted on a later
-invocation; see the [comment placement and idempotency
+writes a warning to stderr. See the [comment placement and idempotency
 guide](docs/comment-placement-and-idempotency.md) for the exact behavior.
 
 <br>

@@ -32,24 +32,34 @@ styles.
 
 ## Ignored nodes
 
-`// afmt:ignore`, `//afmt:ignore`, and `/* afmt:ignore */` are recognized when
-they are the last standalone pre-comment for a node. The node's original
-source bytes are emitted unchanged, including internal blank lines, while the
-marker itself is omitted from the output. A marker between annotations and a
-declaration applies to the complete declaration, rather than to its first
-modifier.
+A comment is a directive when its delimiters are stripped and its first
+whitespace-separated token is `afmt:ignore`. That accepts `// afmt:ignore`,
+`//afmt:ignore`, `/* afmt:ignore */`, and a trailing free-text reason such as
+`// afmt:ignore column alignment is meaningful`. A near miss like
+`// afmt:ignored` is not a directive and formats normally, so a marker that
+does not take effect is either honored elsewhere or reported.
+
+A directive applies when it is the last standalone pre-comment for a node. The
+node's original source bytes are emitted unchanged, including internal blank
+lines. A marker between annotations and a declaration applies to the complete
+declaration, rather than to its first modifier.
+
+The marker is printed alongside the source it preserves, so ignoring a node is
+idempotent: the marker is still there for the next run to find, and a file
+produced by `afmt --write` passes `afmt --check`. `collect_comments` promotes
+an annotation-adjacent marker into the enclosing declaration's bucket, which
+places it inside the preserved span; `build_with_comments_core` detects that
+case with `Comment::is_within` and lets the verbatim bytes carry the marker
+instead of printing it twice.
 
 Multiline preserved source forces its surrounding groups to break so width
 accounting remains correct. Its interior indentation is raw source and is not
 re-anchored to the formatter's current indentation level.
 
 If a recognized marker has no eligible following node, afmt retains the marker
-and emits a warning on stderr. This is an intentional escape hatch from normal
-formatting, so a deliberately non-canonical ignored node can be reformatted on
-a later invocation: once an honored marker has been consumed, a new formatting
-run has no way to identify that node. The idempotency guarantee applies when
-the preserved bytes are already stable, as covered by
-`idempotency_ignore_directive_stable_output`.
+and emits a warning on stderr. An applied marker never warns; `Comment` tracks
+that with `ignore_honored`, which `build_with_comments_core` sets before the
+marker is printed.
 
 ## Implementation boundaries
 
@@ -72,8 +82,14 @@ The static fixtures under `tests/static/` cover the method-chain and unbraced
 The ignore directive fixtures under `tests/ignore/` cover verbatim preservation
 of deliberately non-canonical nodes, internal blank lines, multiline layout,
 inner punctuation, annotation and loop targeting, and recognized marker
-spellings. The `ignore` scenario, `ignored_inner_punctuation_is_idempotent`,
-and `idempotency_ignore_directive_stable_output` tests exercise that coverage.
+spellings including a trailing reason. Because the marker is preserved, every
+fixture is expected to round-trip:
+`ignore_directive_regressions_match_expected_output` asserts each one matches
+its `.cls` and is unchanged by a second pass. The `ignore` scenario (also part
+of `all`), `ignored_inner_punctuation_is_idempotent`, and
+`idempotency_ignore_directive_stable_output` exercise the rest of that
+coverage, and `honored_ignore_directive_does_not_warn` pairs with
+`unhonored_ignore_directive_warns_and_is_preserved` over the stderr contract.
 
 Run the focused checks while iterating:
 

@@ -1,0 +1,10 @@
+public class IgnoreDirectiveReason {
+  // afmt:ignore column alignment is meaningful here
+  Integer   matrix=1;
+
+  /* afmt:ignore see JIRA-123 */
+  Integer   legacy=2;
+
+  // afmt:ignored is not a marker
+  Integer   normal=3;
+}
