@@ -138,11 +138,15 @@ impl Formatter {
             ),
         })?;
 
-        let formatted =
-            Self::try_format_source(&source_code, config).map_err(|message| FormatFileError {
-                path: path.to_path_buf(),
-                message,
-            })?;
+        let formatted = Self::try_format_source_with_origin(
+            &source_code,
+            config,
+            Some(&path.display().to_string()),
+        )
+        .map_err(|message| FormatFileError {
+            path: path.to_path_buf(),
+            message,
+        })?;
 
         Ok(FormattedFile {
             changed: source_code != formatted,
@@ -156,6 +160,16 @@ impl Formatter {
 
     pub fn try_format_source(source_code: &str, config: Config) -> Result<String, String> {
         source_formatter::try_format_source(source_code, config)
+    }
+
+    /// Same as [`Formatter::try_format_source`], with a name for the source —
+    /// a path, `<stdin>` — so diagnostics can point back at it.
+    pub fn try_format_source_with_origin(
+        source_code: &str,
+        config: Config,
+        origin: Option<&str>,
+    ) -> Result<String, String> {
+        source_formatter::try_format_source_with_origin(source_code, config, origin)
     }
 
     pub fn parse(source_code: &str) -> Tree {

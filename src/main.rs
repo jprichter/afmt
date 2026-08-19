@@ -61,6 +61,10 @@ fn run(args: &Args, started: Instant) -> Result<RunSummary, String> {
     run_with_writer(args, started, |path, content| fs::write(path, content))
 }
 
+/// Stands in for a path when the source arrived on stdin, so diagnostics keep
+/// the same `path:line:column` shape they have for files.
+const STDIN_ORIGIN: &str = "<stdin>";
+
 fn format_stdin_source(source: &str, config: Config) -> Result<String, String> {
     // Stdin formatting is a synchronous CLI boundary. Keep the library's public
     // formatter free of process-global hook changes while ensuring a caught
@@ -68,7 +72,7 @@ fn format_stdin_source(source: &str, config: Config) -> Result<String, String> {
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let result = catch_unwind(AssertUnwindSafe(|| {
-        Formatter::try_format_source(source, config)
+        Formatter::try_format_source_with_origin(source, config, Some(STDIN_ORIGIN))
     }));
     std::panic::set_hook(previous_hook);
 

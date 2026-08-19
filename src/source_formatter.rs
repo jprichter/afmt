@@ -91,8 +91,16 @@ pub(crate) fn format_one(source_code: &str, config: Config) -> String {
 }
 
 pub(crate) fn try_format_source(source_code: &str, config: Config) -> Result<String, String> {
+    try_format_source_with_origin(source_code, config, None)
+}
+
+pub(crate) fn try_format_source_with_origin(
+    source_code: &str,
+    config: Config,
+    origin: Option<&str>,
+) -> Result<String, String> {
     match catch_unwind(AssertUnwindSafe(|| {
-        try_format_source_unchecked(source_code, config)
+        try_format_source_unchecked(source_code, config, origin)
     })) {
         Ok(result) => result,
         Err(panic_payload) => Err(format!(
@@ -102,13 +110,17 @@ pub(crate) fn try_format_source(source_code: &str, config: Config) -> Result<Str
     }
 }
 
-fn try_format_source_unchecked(source_code: &str, config: Config) -> Result<String, String> {
+fn try_format_source_unchecked(
+    source_code: &str,
+    config: Config,
+    origin: Option<&str>,
+) -> Result<String, String> {
     config
         .validate()
         .map_err(|error| format!("Invalid formatter configuration: {error}"))?;
 
     let ast_tree = try_parse(source_code)?;
-    let _session = FormattingSession::new(source_code, &ast_tree);
+    let _session = FormattingSession::new(source_code, &ast_tree, origin);
 
     // traverse the tree to build enriched data
     let root: Root = enrich(&ast_tree);
