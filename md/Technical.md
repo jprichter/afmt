@@ -6,13 +6,16 @@
 
 ### Update parser version
 
-Check `dep/update_parser_version.sh`. Steps can be also done manually as:
+The parser is consumed as the `tree-sitter-sfapex` crate, so there is no
+vendored grammar to regenerate. Bump the version in `Cargo.toml`:
 
-1. have `tree-sitter` and `node-js` installed locally
-2. Download the parser repo to `dep/` folder, go to its path
-3. Run `tree-sitter gen ./apex/grammar.js` to generate `./src`
-4. Copy `parser.c` and `tree-sitter` sub folder into `/dep` to replace
-5. Remove the parser repo downloaded in #2
+```toml
+tree-sitter-sfapex = "2.4.0"
+```
+
+Then run `cargo update -p tree-sitter-sfapex` and the test suite. Grammar
+changes are released upstream in
+[tree-sitter-sfapex](https://github.com/aheber/tree-sitter-sfapex).
 
 ## Test
 
@@ -24,10 +27,14 @@ Afmt is heavily guarded by test scripts in `tests` folder
 
 ### Battle testing
 
-Download the lists of Apex repo and format them.
+`tests/battle_test/battle_testing.sh` clones the repos listed in
+`tests/battle_test/repos.txt` and formats them with one bulk command.
 
-`sh tests/battle_test/download.sh`
-`sh tests/battle_test/format.sh`
+`./tests/battle_test/battle_testing.sh`
+`./tests/battle_test/battle_testing.sh --idempotent`
+
+See [Validation and local benchmarks](../docs/validation-and-benchmarks.md)
+for requirements and the local bulk benchmark.
 
 # Extra Info (might outdated)
 
@@ -59,12 +66,12 @@ Download the lists of Apex repo and format them.
 
 ### Format a file:
 ```bash
-./target/release/afmt --file path/to/your_apex_file.cls
+./target/release/afmt path/to/your_apex_file.cls
 ```
 
 ### Run with enabled backtrace:
 ```bash
-RUST_BACKTRACE=1 ./target/release/afmt --file path/to/your_apex_file.cls
+RUST_BACKTRACE=1 ./target/release/afmt path/to/your_apex_file.cls
 ```
 <br>
 

@@ -16,6 +16,7 @@
 - [✨ vs. Prettier Apex](#-vs-prettier-apex)
 - [📥 Installation](#-installation)
 - [💻 Usage](#-usage)
+- [🧩 Editor Integration](#-editor-integration)
 - [🔧 Configuration](#-configuration)
 - [❓ FAQ](#-faq)
 - [🤝 Contribution](#-contribution)
@@ -171,7 +172,7 @@ formatted code. Unchanged files are not rewritten.
 For multiple files, `--write` is best effort: a read, parse, format, or write
 failure is reported with its path, while other valid files continue. A final
 stderr summary reports selected, changed, written, unchanged, failed, and
-elapsed counts. `--check` never writes, lists every file that would change,
+elapsed counts. `-C/--check` never writes, lists every file that would change,
 and exits nonzero for any changed file, processing failure, or empty selection.
 `--time` adds one stderr timing line per selected file and a total; it never
 changes formatted stdout.
@@ -186,7 +187,33 @@ Dry runs selecting one file print only formatted Apex source. Dry runs
 selecting multiple files print each source block with a deterministic
 `==> path <==` delimiter. Exit code `0` means formatting or checking
 succeeded; exit code `1` means an application error, changed file in check
-mode, or partial write failure.
+mode, or partial write failure; exit code `2` means a usage error, such as a
+missing path or combining `-` with `--write` or `--check`.
+
+## 🧩 Editor Integration
+
+### VS Code
+
+Install the [afmt Formatter extension](https://marketplace.visualstudio.com/items?itemName=jprichter.afmt-code-ext).
+It registers `afmt` as the formatter for Apex files and formats the in-memory
+buffer via `afmt -`, so unsaved edits are formatted and a formatter failure
+never modifies the document. The `afmt` binary is not bundled; install it
+first using one of the methods above. Settings:
+
+| Setting | Purpose |
+|-----------------|--------------------------------------------------|
+| `afmt.path` | Path to the `afmt` binary |
+| `afmt.configFile` | Config file passed as `-c` |
+| `afmt.enable` | Enable or disable the formatter |
+
+If you would rather not install an extension, `afmt` can be wired up as a
+build task instead: [Setup in VSCode](./md/VSCode_Setup.md).
+
+### Neovim
+
+See [Setup in Neovim](./md/Neovim_Setup.md).
+
+<br>
 
 ## 🔧 Configuration:
 
@@ -253,9 +280,8 @@ and contributor validation workflow, see
 ## ❓ FAQ
 
 - "TLTR, what features afmt has?" Run `afmt -h`.
-- "How do I set up afmt in VS Code?"
-Install the [afmt Formatter extension](https://marketplace.visualstudio.com/items?itemName=jprichter.afmt-code-ext),
-or wire `afmt` up manually as a task: [Setup in VSCode](./md/VSCode_Setup.md)
+- "How do I set up afmt in my editor?"
+See [Editor Integration](#-editor-integration) for VS Code and Neovim.
 
 - "Can afmt formats exactly the same as Prettier Apex?"
 No.
@@ -285,5 +311,5 @@ CI Rules:
 
 1. Use [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/#summary) for commit messages. Example: the project [commit history](https://github.com/xixiaofinland/afmt/commits/)
 2. Ensure code passes [rustfmt](https://github.com/rust-lang/rustfmt) and [clippy](https://github.com/rust-lang/rust-clippy): `cargo fmt -- --check` and `cargo clippy`
-3. Run and pass all unit tests: `cargo test --all-features`
+3. Run and pass all unit tests: `cargo test --locked --all-features`
 4. Pass battle tests by running `afmt` on a list of [popular Apex repos](./tests/battle_test/repos.txt)
