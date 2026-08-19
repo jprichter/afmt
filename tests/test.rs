@@ -124,6 +124,7 @@ mod tests {
             "IgnoreDirectiveMultiline",
             "IgnoreDirectiveTargets",
             "IgnoreDirectiveReason",
+            "IgnoreDirectiveAnnotationWithoutModifier",
         ] {
             let source = std::fs::read_to_string(format!("tests/ignore/{fixture}.in"))
                 .expect("ignore source fixture should be readable");
