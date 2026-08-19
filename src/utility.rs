@@ -56,6 +56,29 @@ pub fn with_source_code<T>(callback: impl FnOnce(&str) -> T) -> T {
 }
 
 thread_local! {
+    // Where the source being formatted came from, for diagnostics only. `None`
+    // when a library caller formats a string that has no origin to report.
+    static THREAD_SOURCE_ORIGIN: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+pub fn set_thread_source_origin(origin: Option<String>) {
+    THREAD_SOURCE_ORIGIN.with(|o| *o.borrow_mut() = origin);
+}
+
+pub fn clear_thread_source_origin() {
+    THREAD_SOURCE_ORIGIN.with(|o| o.borrow_mut().take());
+}
+
+/// Renders `line:column`, prefixed with the source origin when one is known,
+/// matching the `Prefix: path: message` shape the CLI uses elsewhere.
+pub fn source_location(line: usize, column: usize) -> String {
+    THREAD_SOURCE_ORIGIN.with(|o| match o.borrow().as_deref() {
+        Some(origin) => format!("{origin}:{line}:{column}"),
+        None => format!("{line}:{column}"),
+    })
+}
+
+thread_local! {
     static THREAD_COMMENT_MAP: RefCell<Option<CommentMap>> = const { RefCell::new(None) };
 }
 
@@ -77,7 +100,8 @@ pub fn clear_thread_comment_map() {
 pub fn thread_state_is_empty() -> bool {
     let source_empty = THREAD_SOURCE_CODE.with(|sc| sc.borrow().is_none());
     let comments_empty = THREAD_COMMENT_MAP.with(|cm| cm.borrow().is_none());
-    source_empty && comments_empty
+    let origin_empty = THREAD_SOURCE_ORIGIN.with(|o| o.borrow().is_none());
+    source_empty && comments_empty && origin_empty
 }
 
 pub fn get_comment_bucket(node_id: &usize) -> CommentBucket {

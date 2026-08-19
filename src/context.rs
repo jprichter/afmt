@@ -86,6 +86,9 @@ pub struct Comment {
     pub ignore_honored: Rc<Cell<bool>>,
     pub start_byte: usize,
     pub end_byte: usize,
+    // One-based, so a diagnostic can be pasted straight into an editor.
+    pub start_line: usize,
+    pub start_column: usize,
 }
 
 impl Comment {
@@ -104,6 +107,8 @@ impl Comment {
             _ => panic_unknown_node(node, "Comment"),
         };
 
+        let start = node.start_position();
+
         Self {
             //id,
             value,
@@ -113,6 +118,8 @@ impl Comment {
             ignore_honored: Rc::new(Cell::new(false)),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
+            start_line: start.row + 1,
+            start_column: start.column + 1,
         }
     }
 
@@ -171,8 +178,8 @@ impl<'a> DocBuild<'a> for Comment {
         // only warn when it reaches this path without having been applied.
         if crate::utility::is_ignore_directive(self) && !self.is_ignore_honored() {
             eprintln!(
-                "Warning: afmt:ignore could not be applied at byte {}; directive was preserved",
-                self.start_byte
+                "Warning: {}: afmt:ignore could not be applied; directive was preserved",
+                crate::utility::source_location(self.start_line, self.start_column)
             );
         }
 
