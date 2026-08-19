@@ -180,9 +180,79 @@ mod tests {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("// afmt:ignore"));
         assert!(String::from_utf8_lossy(&output.stderr)
-            .contains("Warning: afmt:ignore could not be applied"));
+            .contains("afmt:ignore could not be applied; directive was preserved"));
 
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn unhonored_ignore_directive_warning_locates_each_file() {
+        let directory = std::env::temp_dir().join(format!(
+            "sf-afmt-ignore-directive-warning-location-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let first_path = directory.join("A.cls");
+        let second_path = directory.join("B.cls");
+        fs::write(&first_path, "public class A {}\n  // afmt:ignore\n").unwrap();
+        fs::write(&second_path, "public class B {}\n// afmt:ignore\n").unwrap();
+
+        let output = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg("--check")
+            .arg(&directory)
+            .output()
+            .expect("failed to execute afmt");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        for (path, line, column) in [(&first_path, 2, 3), (&second_path, 2, 1)] {
+            let expected = format!(
+                "Warning: {}:{}:{}: afmt:ignore could not be applied; directive was preserved",
+                path.display(),
+                line,
+                column
+            );
+            assert!(
+                stderr.contains(&expected),
+                "expected `{expected}` in stderr:\n{stderr}"
+            );
+        }
+        assert!(
+            !stderr.contains("at byte"),
+            "byte offsets are not somewhere an editor can jump to:\n{stderr}"
+        );
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn unhonored_ignore_directive_warning_labels_stdin() {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_afmt"))
+            .arg("-")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("failed to execute afmt");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin should be piped")
+            .write_all(b"public class Stdin {}\n// afmt:ignore\n")
+            .expect("source should be written to stdin");
+        let output = child.wait_with_output().expect("afmt should exit");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(output.status.success());
+        assert!(
+            stderr.contains(
+                "Warning: <stdin>:2:1: afmt:ignore could not be applied; directive was preserved"
+            ),
+            "expected a `<stdin>` location in stderr:\n{stderr}"
+        );
     }
 
     #[test]
