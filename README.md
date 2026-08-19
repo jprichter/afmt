@@ -27,7 +27,8 @@
 `afmt` (Apex formatting tool) is written in Rust 🦀 and leverages the [tree-sitter sfapex parser](https://github.com/aheber/tree-sitter-sfapex).
 
 > [!NOTE]
-> We're looking for contributors to help create a VSCode plugin! Feel free to join the [discussion](https://github.com/xixiaofinland/afmt/issues/83)!
+> A VS Code extension is now available: [afmt Formatter](https://marketplace.visualstudio.com/items?itemName=jprichter.afmt-code-ext).
+> It formats the in-memory buffer via `afmt -`, and expects the `afmt` binary to be installed separately.
 
 <br>
 
@@ -99,7 +100,7 @@ powershell -ExecutionPolicy Bypass -File install-afmt.ps1
 
 ### 2. Cargo Install
 
-`afmt` is published in creates.io [here](https://crates.io/crates/sf-afmt).
+`afmt` is published on crates.io [here](https://crates.io/crates/sf-afmt).
 Run cmd below if you have the `Cargo` tool.
 
 ```bash
@@ -191,7 +192,7 @@ mode, or partial write failure.
 
 `-c` parameter can read configuration settings from a toml file.
 
-Example: `afmt -c .afmt.toml`
+Example: `afmt -c .afmt.toml ./file.cls`
 
 In an explicitly supplied `.afmt.toml` config file, formatter settings, optional
 style controls, and optional file-selection settings are supported. A config
@@ -202,7 +203,7 @@ file is not loaded implicitly.
 max_width = 80
 
 # Indentation size in spaces
-indent_size = 4
+indent_size = 2
 
 # Optional style controls (defaults preserve afmt's existing output)
 # brace_style = "k_and_r"            # or "allman"
@@ -252,8 +253,9 @@ and contributor validation workflow, see
 ## ❓ FAQ
 
 - "TLTR, what features afmt has?" Run `afmt -h`.
-- "How do I set up afmt in VSCode?"
-[Setup in VSCode](./md/VSCode_Setup.md)
+- "How do I set up afmt in VS Code?"
+Install the [afmt Formatter extension](https://marketplace.visualstudio.com/items?itemName=jprichter.afmt-code-ext),
+or wire `afmt` up manually as a task: [Setup in VSCode](./md/VSCode_Setup.md)
 
 - "Can afmt formats exactly the same as Prettier Apex?"
 No.
