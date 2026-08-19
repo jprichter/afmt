@@ -1,5 +1,13 @@
 # Configurations to take into consideration
 
+> [!IMPORTANT]
+> This is a design backlog, not a reference. The options below are `rustfmt`
+> settings kept here as prior art for options `afmt` may adopt. None of them
+> are implemented, and the defaults quoted are rustfmt's, not afmt's.
+>
+> For the options `afmt` actually supports, see
+> [the formatter configuration guide](../docs/configuration.md).
+
 ## `max_width`
 
 Maximum width of each line
