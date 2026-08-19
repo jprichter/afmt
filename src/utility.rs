@@ -221,6 +221,39 @@ fn is_associable_unnamed_node(node: &Node) -> bool {
     is_punctuation_node(node) || matches!(node.kind(), "else")
 }
 
+// The node an ignore directive pending in front of `child` should preserve,
+// when annotations have already pulled the directive inside the declaration.
+// Returns `None` when the directive belongs to `child` as it stands.
+fn ignore_promotion_target(node: &Node, child: &Node) -> Option<usize> {
+    // With an access modifier present the directive lands inside `modifiers`,
+    // in front of the first `modifier`.
+    if node.kind() == "modifiers" && child.kind() == "modifier" {
+        return node.parent().map(|declaration| declaration.id());
+    }
+
+    // With annotations alone there is no `modifier` to hold it, so the parser
+    // closes `modifiers` and the directive becomes a sibling of the type.
+    if follows_modifiers(child) {
+        return Some(node.id());
+    }
+
+    None
+}
+
+// Whether the nearest preceding non-comment sibling of `node` is a `modifiers`
+// node, meaning `node` is the first thing a declaration says after its
+// annotations and modifiers.
+fn follows_modifiers(node: &Node) -> bool {
+    let mut previous = node.prev_sibling();
+    while let Some(sibling) = previous {
+        if !sibling.is_extra() {
+            return sibling.kind() == "modifiers";
+        }
+        previous = sibling.prev_sibling();
+    }
+    false
+}
+
 pub fn collect_comments(cursor: &mut TreeCursor, comment_map: &mut CommentMap) {
     let node = cursor.node();
 
@@ -329,24 +362,20 @@ pub fn collect_comments(cursor: &mut TreeCursor, comment_map: &mut CommentMap) {
             // It's an associable node
             let child_id = child.id();
 
-            // A directive between annotations and a declaration can be attached
-            // to the declaration's first modifier. Promote it to the enclosing
-            // declaration so the complete declaration is preserved verbatim.
-            if node.kind() == "modifiers"
-                && child.kind() == "modifier"
-                && pending_pre_comments.last().is_some_and(is_ignore_directive)
-            {
-                let ignore_comment = pending_pre_comments
-                    .pop()
-                    .expect("ignore directive was present");
-                if let Some(parent) = node.parent() {
+            // A directive between annotations and a declaration attaches to
+            // whichever node the parser hands back next. Promote it to the
+            // enclosing declaration so the complete declaration is preserved
+            // verbatim rather than just that node.
+            if pending_pre_comments.last().is_some_and(is_ignore_directive) {
+                if let Some(declaration_id) = ignore_promotion_target(&node, &child) {
+                    let ignore_comment = pending_pre_comments
+                        .pop()
+                        .expect("ignore directive was present");
                     comment_map
-                        .entry(parent.id())
+                        .entry(declaration_id)
                         .or_insert_with(CommentBucket::new)
                         .pre_comments
                         .push(ignore_comment);
-                } else {
-                    pending_pre_comments.push(ignore_comment);
                 }
             }
 
