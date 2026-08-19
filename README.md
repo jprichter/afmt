@@ -263,7 +263,7 @@ Integer[] matrix = new Integer[]{ 1, 0, 0,
 `//afmt:ignore` and `/* afmt:ignore */` work too, and the marker may carry a
 free-text reason, as in `// afmt:ignore column alignment is meaningful here`. A
 marker between annotations and a declaration applies to the complete
-declaration.
+declaration, whether or not that declaration has an access modifier.
 
 The marker stays in the output, so an ignored node stays ignored on every later
 run and `afmt --check` passes on a file that `afmt --write` produced. Multiline
@@ -271,7 +271,13 @@ preserved source keeps its authored interior indentation and forces surrounding
 layout to break; afmt does not re-anchor its interior lines.
 
 If a recognized marker has no eligible following node, afmt preserves it and
-writes a warning to stderr. See the [comment placement and idempotency
+writes a warning to stderr naming the marker's position:
+
+```
+Warning: force-app/main/default/classes/Example.cls:12:5: afmt:ignore could not be applied; directive was preserved
+```
+
+See the [comment placement and idempotency
 guide](docs/comment-placement-and-idempotency.md) for the exact behavior.
 
 <br>
