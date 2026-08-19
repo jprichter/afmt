@@ -1,7 +1,9 @@
 # Config afmt in VSCode
 
-At the moment there is no dedicated plugin in VSCode for `afmt`, but we can
-usage the built-in `tasks` feature to invoke `afmt` from VSCode.
+The recommended setup is the [afmt Formatter extension](https://marketplace.visualstudio.com/items?itemName=jprichter.afmt-code-ext),
+which registers `afmt` as the native formatter for Apex files. If you would
+rather not install an extension, you can use VSCode's built-in `tasks` feature
+to invoke `afmt` from VSCode, as described below.
 
 VSCode supports running tasks via `tasks.json`, which allows running shell commands on files.
 

@@ -29,7 +29,7 @@ remain valid:
 
 ```toml
 max_width = 80
-indent_size = 4
+indent_size = 2
 
 [files]
 include = ["**/*.cls", "**/*.trigger", "**/*.apex", "**/*.apexc"]
