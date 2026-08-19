@@ -42,7 +42,12 @@ does not take effect is either honored elsewhere or reported.
 A directive applies when it is the last standalone pre-comment for a node. The
 node's original source bytes are emitted unchanged, including internal blank
 lines. A marker between annotations and a declaration applies to the complete
-declaration, rather than to its first modifier.
+declaration, rather than to the node the parser happens to hand back next.
+That node depends on what the declaration says: with an access modifier the
+marker lands inside `modifiers`, in front of the first `modifier`; with
+annotations alone `modifiers` closes after the annotation and the marker
+becomes a sibling of the type. `ignore_promotion_target` recognizes both and
+promotes to the declaration either way.
 
 The marker is printed alongside the source it preserves, so ignoring a node is
 idempotent: the marker is still there for the next run to find, and a file
@@ -57,9 +62,20 @@ accounting remains correct. Its interior indentation is raw source and is not
 re-anchored to the formatter's current indentation level.
 
 If a recognized marker has no eligible following node, afmt retains the marker
-and emits a warning on stderr. An applied marker never warns; `Comment` tracks
-that with `ignore_honored`, which `build_with_comments_core` sets before the
-marker is printed.
+and emits a warning on stderr:
+
+```
+Warning: force-app/main/default/classes/Example.cls:12:5: afmt:ignore could not be applied; directive was preserved
+```
+
+The location is the marker's own one-based line and column. The prefix is the
+path afmt was given, `<stdin>` when the source arrived on stdin, and absent
+for a library caller that formatted a string through
+`Formatter::try_format_source`; `Formatter::try_format_source_with_origin`
+supplies one.
+
+An applied marker never warns; `Comment` tracks that with `ignore_honored`,
+which `build_with_comments_core` sets before the marker is printed.
 
 ## Implementation boundaries
 
@@ -81,15 +97,22 @@ The static fixtures under `tests/static/` cover the method-chain and unbraced
 
 The ignore directive fixtures under `tests/ignore/` cover verbatim preservation
 of deliberately non-canonical nodes, internal blank lines, multiline layout,
-inner punctuation, annotation and loop targeting, and recognized marker
-spellings including a trailing reason. Because the marker is preserved, every
-fixture is expected to round-trip:
-`ignore_directive_regressions_match_expected_output` asserts each one matches
-its `.cls` and is unchanged by a second pass. The `ignore` scenario (also part
-of `all`), `ignored_inner_punctuation_is_idempotent`, and
+inner punctuation, annotation and loop targeting, declarations carrying an
+annotation with no access modifier, and recognized marker spellings including a
+trailing reason. Because the marker is preserved, every fixture is expected to
+round-trip: `ignore_directive_regressions_match_expected_output` asserts each
+one matches its `.cls` and is unchanged by a second pass. The `ignore` scenario
+(also part of `all`), `ignored_inner_punctuation_is_idempotent`, and
 `idempotency_ignore_directive_stable_output` exercise the rest of that
-coverage, and `honored_ignore_directive_does_not_warn` pairs with
-`unhonored_ignore_directive_warns_and_is_preserved` over the stderr contract.
+coverage.
+
+Three tests hold the stderr contract:
+`honored_ignore_directive_does_not_warn` asserts an applied marker stays
+silent, `unhonored_ignore_directive_warns_and_is_preserved` asserts the marker
+survives the run that warns about it, and
+`unhonored_ignore_directive_warning_locates_each_file` plus
+`unhonored_ignore_directive_warning_labels_stdin` pin the `path:line:column`
+prefix over a directory of several files and over stdin.
 
 Run the focused checks while iterating:
 
