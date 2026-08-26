@@ -9,10 +9,13 @@ public class MultilineString {
 "Endpoint": "http://example.com/api"
 }
 ''';
-    consume('''first line
+    consume('''
+first line
 second line
 ''');
-    String interpolation = '''${accountName}''';
+    String interpolation = '''
+${accountName}
+''';
   }
   private static void consume(String value) {
     System.debug(value);
