@@ -223,7 +223,7 @@ impl<'a> DocBuild<'a> for Comment {
                         } else if i == lines.len() - 1 {
                             if let Some(before_end) = trimmed.strip_suffix("*/") {
                                 let content = before_end.trim();
-                                if content.is_empty() {
+                                if content.chars().all(|c| c == '*') {
                                     result.push(b.txt(format!("{star}/")));
                                 } else {
                                     result.push(b.txt(format!("{star} {content}"))); // First line: Preserve content
