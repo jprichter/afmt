@@ -30,6 +30,14 @@ following Apex node.
 These placements are attachment behavior, not alternate brace or indentation
 styles.
 
+## JavaDoc closing lines
+
+JavaDoc blocks (`/** ... */`) normalize a closing line that contains only stars
+before the terminator as an empty close. For example, `**/` and `***/` emit the
+same normal closing line as `*/`, using the configured star-column style, rather
+than creating a phantom content line such as `* *`. Text before the terminator
+is still treated as closing-line content and is emitted before a separate close.
+
 ## Ignored nodes
 
 A comment is a directive when its delimiters are stripped and its first
@@ -105,6 +113,10 @@ one matches its `.cls` and is unchanged by a second pass. The `ignore` scenario
 (also part of `all`), `ignored_inner_punctuation_is_idempotent`, and
 `idempotency_ignore_directive_stable_output` exercise the rest of that
 coverage.
+
+The JavaDoc fixture under `tests/comments/` covers star-only closing lines such
+as `**/`; `idempotency_comments` verifies that their normalized output is a
+fixed point.
 
 Three tests hold the stderr contract:
 `honored_ignore_directive_does_not_warn` asserts an applied marker stays
