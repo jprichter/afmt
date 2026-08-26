@@ -12,6 +12,8 @@ focused project documentation below.
   [docs/comment-placement-and-idempotency.md](docs/comment-placement-and-idempotency.md)
 - Name-path chain formatting:
   [docs/name-path-chain-formatting.md](docs/name-path-chain-formatting.md)
+- Apex multiline string literal support:
+  [docs/multiline-string-literals.md](docs/multiline-string-literals.md)
 - User-facing bulk formatting, configuration, discovery, and CLI semantics:
   [docs/project-wide-formatting.md](docs/project-wide-formatting.md)
 - Test, battle-corpus, and local benchmark workflow:
