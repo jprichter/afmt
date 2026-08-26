@@ -1,0 +1,20 @@
+public class MultilineString {
+  public static void run() {
+    String accountName = 'Acme';
+    String date = '2026-08-25';
+    String multiLineString = '''
+{
+"Account": "${accountName}",
+"Last Updated": "${date}",
+"Endpoint": "http://example.com/api"
+}
+''';
+    consume('''first line
+second line
+''');
+    String interpolation = '''${accountName}''';
+  }
+  private static void consume(String value) {
+    System.debug(value);
+  }
+}

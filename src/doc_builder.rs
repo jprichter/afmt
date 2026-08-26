@@ -191,7 +191,7 @@ impl<'a> DocBuilder<'a> {
 
     pub fn txt(&'a self, text: impl ToString) -> DocRef<'a> {
         let s = text.to_string();
-        let width = s.len() as u32;
+        let width = s.find('\n').unwrap_or(s.len()) as u32;
         self.arena.alloc(Doc::Text(s, width))
     }
 

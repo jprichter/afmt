@@ -256,6 +256,7 @@ impl Expression {
             | "array_access"
             | "field_access"
             | "string_literal"
+            | "multi_line_string_literal"
             | "version_expression"
             | "java_field_access"
             | "this"
@@ -350,7 +351,8 @@ impl PrimaryExpression {
             | "decimal_floating_point_literal"
             | "boolean"
             | "null_literal"
-            | "string_literal" => Self::Literal(Literal_::new(n)),
+            | "string_literal"
+            | "multi_line_string_literal" => Self::Literal(Literal_::new(n)),
             "identifier" => Self::Identifier(ValueNode::new(n)),
             "class_literal" => Self::Class(ClassLiteral::new(n)),
             "method_invocation" => Self::Method(MethodInvocation::new(n)),
@@ -459,7 +461,7 @@ impl Literal_ {
             "boolean" => Self::Bool(ValueNodeLowerCase::new(node)),
             "null_literal" => Self::Null(ValueNodeLowerCase::new(node)),
             "int" => Self::Int(ValueNode::new(node)),
-            "string_literal" => Self::Str(ValueNode::new(node)),
+            "string_literal" | "multi_line_string_literal" => Self::Str(ValueNode::new(node)),
             "decimal_floating_point_literal" => Self::Decimal(ValueNodeLowerCase::new(node)),
             _ => panic_unknown_node(node, "Literal_"),
         }
