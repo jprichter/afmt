@@ -72,10 +72,16 @@ pub fn clear_thread_source_origin() {
 /// Renders `line:column`, prefixed with the source origin when one is known,
 /// matching the `Prefix: path: message` shape the CLI uses elsewhere.
 pub fn source_location(line: usize, column: usize) -> String {
-    THREAD_SOURCE_ORIGIN.with(|o| match o.borrow().as_deref() {
+    THREAD_SOURCE_ORIGIN.with(|o| format_source_location(o.borrow().as_deref(), line, column))
+}
+
+/// Same rendering as [`source_location`] for callers that hold the origin
+/// directly instead of reading the thread-local one.
+pub fn format_source_location(origin: Option<&str>, line: usize, column: usize) -> String {
+    match origin {
         Some(origin) => format!("{origin}:{line}:{column}"),
         None => format!("{line}:{column}"),
-    })
+    }
 }
 
 thread_local! {

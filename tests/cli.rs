@@ -306,6 +306,52 @@ fn check_lists_all_changed_paths_and_accepts_a_fully_formatted_file() {
 }
 
 #[test]
+fn stdin_parse_errors_locate_the_error_by_line_and_column() {
+    let directory = temporary_directory();
+    let source = "public class Broken {\n    void run() {\n        Integer x = ;\n    }\n}\n";
+
+    let output = run_cli_with_stdin(&directory, &["-"], source);
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    // The extension pipes a buffer, so `<stdin>` stands in for the path while
+    // the line and column still point at the offending token.
+    assert!(
+        stderr.contains("<stdin>:3:"),
+        "stdin parse error should be located: {stderr}"
+    );
+    assert!(stderr.contains("Parser encounters an error node"));
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
+fn file_parse_errors_carry_one_path_line_and_column() {
+    let directory = temporary_directory();
+    let invalid = directory.join("Broken.cls");
+    fs::write(
+        &invalid,
+        "public class Broken {\n    void run() {\n        Integer x = ;\n    }\n}\n",
+    )
+    .expect("invalid source should be written");
+
+    let output = run_cli(&directory, &[invalid.to_str().unwrap()]);
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be UTF-8");
+    // The location is self-contained, so the `Error:` wrapper must not repeat
+    // the path it already carries.
+    let expected_opening = format!("Error: {}:3:", invalid.display());
+    let first_line = stderr.lines().next().expect("stderr should have a line");
+    assert!(
+        first_line.starts_with(&expected_opening),
+        "file parse error should open with a single located path: {first_line}"
+    );
+
+    fs::remove_dir_all(directory).expect("temporary directory should be removed");
+}
+
+#[test]
 fn check_parse_error_and_no_match_are_nonzero_without_writes() {
     let directory = temporary_directory();
     let invalid = directory.join("a-invalid.cls");

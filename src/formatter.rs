@@ -41,7 +41,14 @@ pub struct FormatFileError {
 
 impl std::fmt::Display for FormatFileError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{}: {}", self.path.display(), self.message)
+        // Diagnostics that already lead with their own `path:line:column`
+        // locate themselves; prefixing the path again would repeat it.
+        let path = self.path.display().to_string();
+        if self.message.starts_with(&format!("{path}:")) {
+            return write!(formatter, "{}", self.message);
+        }
+
+        write!(formatter, "{}: {}", path, self.message)
     }
 }
 
