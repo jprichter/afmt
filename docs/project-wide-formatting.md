@@ -81,6 +81,35 @@ Exit status `0` means the requested operation completed successfully. Exit
 status `1` indicates an application error, a changed file in check mode, or a
 partial write failure.
 
+### Parse error locations
+
+A parse failure leads with the offending node's one-based line and column so an
+editor can jump to it, then reports the node kind, byte range, and snippet:
+
+```
+Error: force-app/main/default/classes/Broken.cls:3:19: parse error in node kind: ERROR, at byte range: 57-58, snippet: =
+Parent node kind: local_variable_declaration, at force-app/main/default/classes/Broken.cls:3:9, byte range: 47-60, snippet: Integer x = ;
+Parser encounters an error node in the tree.
+```
+
+The prefix follows the same origin rule as the unhonored-directive warning: the
+path afmt was given, `<stdin>` when the source arrived on stdin, and a bare
+`line:column` for a library caller that used
+`Formatter::try_format_source`. Because the diagnostic locates itself,
+`FormatFileError`'s `Display` omits its own path prefix when the message
+already opens with that path, so the path appears once per line.
+
+An editor integration that pipes a buffer through `afmt -` gets `<stdin>` as
+the origin — afmt is not told which file the buffer came from — so the client
+maps the reported line and column back onto the document it sent.
+
+`stdin_parse_errors_locate_the_error_by_line_and_column` and
+`file_parse_errors_carry_one_path_line_and_column` in `tests/cli.rs` pin this
+contract end to end, and `parse_failures_lead_with_the_error_node_location`,
+`parse_failures_locate_stdin_when_no_path_exists`, and
+`parse_failures_report_bare_line_and_column_without_an_origin` in
+`src/source_formatter.rs` pin the three origin forms.
+
 ### Changes to stdout from earlier releases
 
 Two stdout behaviors changed so that stdout carries the formatted document and
