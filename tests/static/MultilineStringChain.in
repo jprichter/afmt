@@ -1,0 +1,7 @@
+public class MultilineStringChain{
+public static void run(){
+String s='''
+x
+'''.trim().toLowerCase().replace('a', 'b').substring(0, 10).trim();
+}
+}

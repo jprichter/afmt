@@ -1,0 +1,7 @@
+public class MultilineStringTrailingCode {
+  public static void run() {
+    String s = '''
+x
+'''.trim();
+  }
+}
