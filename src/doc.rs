@@ -205,7 +205,9 @@ impl<'a> PrettyPrinter<'a> {
                         // do nothing to avoid "double spacing" in comment node handling
                     } else {
                         result.push_str(text);
-                        self.col += width;
+                        self.col = text
+                            .rsplit_once('\n')
+                            .map_or(self.col + width, |(_, last_line)| last_line.len() as u32);
                     }
                 }
                 Doc::Verbatim(text) => {
@@ -328,9 +330,13 @@ impl<'a> PrettyPrinter<'a> {
                         return true;
                     }
                 }
-                Doc::Text(_, text_width) => {
+                Doc::Text(text, text_width) => {
                     if *text_width <= remaining_width {
-                        remaining_width -= text_width;
+                        remaining_width = text
+                            .rsplit_once('\n')
+                            .map_or(remaining_width - text_width, |(_, last_line)| {
+                                self.max_width.saturating_sub(last_line.len() as u32)
+                            });
                     } else {
                         return false;
                     }

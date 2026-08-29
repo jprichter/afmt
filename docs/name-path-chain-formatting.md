@@ -17,3 +17,9 @@ This is a canonical reflow rule: existing whitespace before a name-path dot is
 repaired rather than preserved. The battle-test script includes a syntactic
 check for any remaining line-start dot whose preceding nonblank line is a pure
 dotted-identifier path.
+
+When a chained expression follows a multiline string literal, the literal's
+interior lines are preserved and width accounting resumes at the closing
+delimiter's column. That prevents an earlier assignment from breaking solely
+because the literal contains newlines; the trailing chain still wraps when its
+own final line exceeds the configured width.
